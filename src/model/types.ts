@@ -7,6 +7,8 @@ export interface Player {
   id: string;
   name: string;
   color: string;
+  /** Color del auto en Trackmania (si no se eligió, se usa `color`). */
+  carColor?: string;
   createdAt: string;
   /** Un jugador archivado no aparece al armar torneos nuevos, pero sigue en el historial. */
   archived?: boolean;

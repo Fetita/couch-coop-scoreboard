@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PLAYER_COLORS } from '../model/colors';
+import { ColorPicker } from '../components/ColorPicker';
+import { carColor } from '../model/colors';
 import type { Player } from '../model/types';
 import { addPlayer, isPlayerUsed, removePlayer, updatePlayer } from '../store/actions';
 import { update, useData } from '../store/store';
@@ -98,17 +99,13 @@ function PlayerRow({ player, used, run }: {
   return (
     <li className="card stack">
       <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Nombre" />
-      <div className="colors">
-        {PLAYER_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={`swatch${c === player.color ? ' on' : ''}`}
-            style={{ background: c }}
-            aria-label={`Color ${c}`}
-            onClick={() => run((d) => updatePlayer(d, player.id, { color: c }))}
-          />
-        ))}
+      <div className="field">
+        <span className="field-label">Color</span>
+        <ColorPicker label="Color" value={player.color} onChange={(c) => run((d) => updatePlayer(d, player.id, { color: c }))} />
+      </div>
+      <div className="field">
+        <span className="field-label">Color del auto en Trackmania</span>
+        <ColorPicker label="Color del auto" value={carColor(player)} onChange={(c) => run((d) => updatePlayer(d, player.id, { carColor: c }))} />
       </div>
       <div className="row">
         <button

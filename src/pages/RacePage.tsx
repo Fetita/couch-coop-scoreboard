@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { digitsToMs, formatGap, formatTime, msToDigits, racePoints, raceState } from '../games/tmRace';
 import { addRun, deleteEvent, deleteRace, eliminateManually, setRaceOrder, trackRecords, updateEvent } from '../games/tmTournament';
+import { carColor } from '../model/colors';
 import { shuffle } from '../model/random';
 import type { Player, TrackmaniaEvent } from '../model/types';
 import { update, useData } from '../store/store';
@@ -49,7 +50,8 @@ export function RacePage() {
 
   const save = (timeMs: number | null) => {
     if (!state.next) return;
-    if (run((d) => addRun(d, tid, race.id, state.next!, timeMs, !state.firstLap && outOfFuel))) {
+    const fuelOut = !state.firstLap && (outOfFuel || state.noFuel.has(state.next));
+    if (run((d) => addRun(d, tid, race.id, state.next!, timeMs, fuelOut))) {
       setDigits('');
       setOutOfFuel(false);
     }
@@ -82,7 +84,10 @@ export function RacePage() {
             <h2>{state.firstLap ? 'Primera vuelta' : 'Eliminación'}</h2>
             <span className="muted">intento {(state.attempts.get(state.next!) ?? 0) + 1}</span>
           </div>
-          <p className="big-runner">Corre <strong>{name(state.next)}</strong></p>
+          <p className="big-runner">
+            <span className="car-swatch" style={{ background: carColor(players.get(state.next ?? '')) }} />
+            Corre <strong>{name(state.next)}</strong>
+          </p>
           {target && (
             <p className="muted">
               Para seguir tiene que bajar {formatTime(state.best.get(target) ?? null)} de {name(target)}.
@@ -99,12 +104,14 @@ export function RacePage() {
             />
             <span className="time-preview">{preview !== null ? formatTime(preview) : digits ? 'inválido' : '0.000'}</span>
           </label>
-          {!state.firstLap && (
+          {!state.firstLap && (state.noFuel.has(state.next!) ? (
+            <p className="fuel-out">⛽ Ya está sin nafta: si no supera a nadie, queda eliminado.</p>
+          ) : (
             <label className="toggle">
               <input type="checkbox" checked={outOfFuel} onChange={(e) => setOutOfFuel(e.target.checked)} />
               <span>Se quedó sin nafta</span>
             </label>
-          )}
+          ))}
           <div className="row">
             <button type="button" className="btn grow" onClick={() => save(null)}>No terminó</button>
             <button type="button" className="btn btn-primary grow" disabled={preview === null} onClick={() => save(preview)}>
@@ -137,6 +144,7 @@ export function RacePage() {
               gap={formatGap(state.best.get(p), leaderTime)} attempts={state.attempts.get(p) ?? 0}
               points={state.finished ? points.get(p) : undefined}
               running={p === state.next}
+              noFuel={state.noFuel.has(p)}
               onEliminate={state.finished ? undefined : () => {
                 if (window.confirm(`¿Marcar a ${name(p)} como eliminado?`)) run((d) => eliminateManually(d, tid, race.id, p));
               }} />
@@ -179,7 +187,7 @@ export function RacePage() {
   );
 }
 
-function BoardRow({ player, position, time, gap, attempts, points, running, out, onEliminate }: {
+function BoardRow({ player, position, time, gap, attempts, points, running, out, noFuel, onEliminate }: {
   player?: Player;
   position: number;
   time: number | null;
@@ -188,16 +196,18 @@ function BoardRow({ player, position, time, gap, attempts, points, running, out,
   points?: number;
   running?: boolean;
   out?: boolean;
+  noFuel?: boolean;
   onEliminate?: () => void;
 }) {
   return (
     <li className={`board-row${out ? ' out' : ''}${running ? ' running' : ''}`}>
       <span className="board-pos">{position}</span>
-      <span className="name-cell grow"><span className="dot" style={{ background: player?.color }} /> {player?.name ?? '?'}</span>
+      <span className="name-cell grow"><span className="dot" style={{ background: carColor(player) }} /> {player?.name ?? '?'}</span>
       <span className="board-time">
         {formatTime(time)}
         {gap && <span className="hint"> {gap}</span>}
       </span>
+      {noFuel && <span className="fuel-badge" title="Sin nafta">⛽</span>}
       <span className="hint board-att">{attempts}×</span>
       {points !== undefined && <span className="board-pts">{points} pts</span>}
       {out && points === undefined && <span className="hint">⛽</span>}

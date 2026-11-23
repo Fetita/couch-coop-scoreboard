@@ -25,9 +25,16 @@ export function NewTournamentPage() {
     setStep('players');
   };
 
+  const [formatFor, setFormatFor] = useState('');
+
   const toFormat = () => {
-    // La propuesta se recalcula con la cantidad de jugadores elegida.
-    setFormat(proposeFormat(game!, playerIds.length));
+    // La propuesta se recalcula solo si cambió el juego o la cantidad de jugadores,
+    // así volver a "Formato" no pierde lo que ya se ajustó.
+    const key = `${game}:${playerIds.length}`;
+    if (!format || key !== formatFor) {
+      setFormat(proposeFormat(game!, playerIds.length));
+      setFormatFor(key);
+    }
     setStep('format');
   };
 
@@ -55,9 +62,23 @@ export function NewTournamentPage() {
         )}
         <h1>Nuevo torneo</h1>
         <ol className="steps" aria-label="Pasos">
-          <li className={step === 'game' ? 'on' : ''}>Juego</li>
-          <li className={step === 'players' ? 'on' : ''}>Jugadores</li>
-          <li className={step === 'format' ? 'on' : ''}>Formato</li>
+          {([
+            ['game', 'Juego', true],
+            ['players', 'Jugadores', game !== null],
+            ['format', 'Formato', game !== null && playerIds.length >= 2],
+          ] as const).map(([id, label, enabled]) => (
+            <li key={id}>
+              <button
+                type="button"
+                className={step === id ? 'on' : ''}
+                disabled={!enabled}
+                aria-current={step === id ? 'step' : undefined}
+                onClick={() => (id === 'format' ? (step !== 'format' && toFormat()) : setStep(id))}
+              >
+                {label}
+              </button>
+            </li>
+          ))}
         </ol>
       </header>
 

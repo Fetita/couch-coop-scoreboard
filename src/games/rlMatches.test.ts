@@ -28,6 +28,7 @@ describe('partidos de Rocket League', () => {
     expect(saved.winner).toBe(2);
     expect(saved.stats).toEqual({ [m.team2[0]]: { goals: 2, saves: 0 } });
     expect(saved.playedAt).toBeTruthy();
+    expect(() => recordResult(t, m.id, 1, { [m.team1[0]]: { goals: 1, saves: 0 }, [m.team2[0]]: { goals: 1, saves: 0 } })).toThrow(/gol de oro/);
     t = clearResult(t, m.id);
     expect(isPlayed(t.rlMatches[0])).toBe(false);
   });

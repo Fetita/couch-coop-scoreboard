@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TeamLine } from '../components/RocketLeagueSection';
 import { Stepper } from '../components/Stepper';
 import { clearResult, recordResult, removeMatch, setTeams } from '../games/rlMatches';
-import { isPlayed, teamGoals, winnerWarning } from '../games/rlStandings';
+import { goalsWinner, isPlayed, resultError, teamGoals } from '../games/rlStandings';
 import type { Player, RocketLeagueMatch, RocketLeagueStat } from '../model/types';
 import { mapTournament } from '../store/actions';
 import { update, useData } from '../store/store';
@@ -47,18 +47,18 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
   const draft: RocketLeagueMatch = { ...match, stats, winner };
   const g1 = teamGoals(draft, 1);
   const g2 = teamGoals(draft, 2);
-  const warning = winnerWarning(draft);
+  const byGoals = goalsWinner(draft);
+  const problem = resultError(draft);
 
   const setStat = (pid: string, field: keyof RocketLeagueStat, value: number) => {
     const current: RocketLeagueStat | undefined = stats[pid];
     const next = { ...stats, [pid]: { ...(current ?? { goals: 0, saves: 0 }), [field]: value } };
     setStats(next);
     if (field === 'goals') {
-      // Con goles distintos, el ganador es obvio: se marca solo (se puede cambiar).
-      const d = { ...match, stats: next };
-      const a = teamGoals(d, 1);
-      const b = teamGoals(d, 2);
-      if (a !== b) setWinner(a > b ? 1 : 2);
+      // Si hay goles cargados, el ganador lo definen los goles.
+      const w = goalsWinner({ ...match, stats: next });
+      if (w === 1 || w === 2) setWinner(w);
+      else if (w === 'tie') setWinner(undefined);
     }
   };
 
@@ -132,19 +132,23 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
             <h2>¿Quién ganó?</h2>
             <div className="winner-buttons">
               {([1, 2] as const).map((side) => (
-                <button key={side} type="button" className={`btn winner-btn${winner === side ? ' on' : ''}`} onClick={() => setWinner(side)}>
+                <button key={side} type="button" className={`btn winner-btn${winner === side ? ' on' : ''}`} disabled={byGoals !== null} onClick={() => setWinner(side)}>
                   <span>Equipo {side}</span>
                   <TeamLine ids={side === 1 ? match.team1 : match.team2} players={players} />
                 </button>
               ))}
             </div>
-            <p className="hint">No hay empates: si terminó igualado, gana el del gol de oro en overtime. Goles y saves son opcionales.</p>
-            {warning && <p className="warning">{warning}</p>}
+            <p className="hint">
+              {byGoals !== null
+                ? 'Con goles cargados, gana el equipo que hizo más. Si terminó igualado, sumá el gol de oro del overtime.'
+                : 'No hay empates: gana el del gol de oro en overtime. Goles y saves son opcionales.'}
+            </p>
+            {problem && (winner || byGoals === 'tie') && <p className="error">{problem}</p>}
             {error && <p className="error">{error}</p>}
             <button
               type="button"
               className="btn btn-primary btn-block"
-              disabled={!winner}
+              disabled={problem !== null}
               onClick={() => { if (run((t) => recordResult(t, match.id, winner!, stats))) onDone(); }}
             >
               Guardar resultado

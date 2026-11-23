@@ -26,13 +26,21 @@ export function hasStats(m: RocketLeagueMatch): boolean {
   return Object.values(m.stats).some((s) => s.goals > 0 || s.saves > 0);
 }
 
-/** Si los goles cargados contradicen al ganador elegido, devuelve el aviso. */
-export function winnerWarning(m: RocketLeagueMatch): string | null {
-  if (!isPlayed(m)) return null;
-  const own = teamGoals(m, m.winner!);
-  const other = teamGoals(m, m.winner === 1 ? 2 : 1);
-  if (own < other) return 'El ganador tiene menos goles cargados que el rival.';
-  if (own === other && own > 0) return 'Los goles están empatados: falta el gol de oro.';
+/** Ganador según los goles cargados: 'tie' si empatan, null si no se cargaron goles. */
+export function goalsWinner(m: RocketLeagueMatch): 1 | 2 | 'tie' | null {
+  const g1 = teamGoals(m, 1);
+  const g2 = teamGoals(m, 2);
+  if (g1 === 0 && g2 === 0) return null;
+  if (g1 === g2) return 'tie';
+  return g1 > g2 ? 1 : 2;
+}
+
+/** Por qué no se puede guardar este resultado, o null si está bien. */
+export function resultError(m: RocketLeagueMatch): string | null {
+  const byGoals = goalsWinner(m);
+  if (byGoals === 'tie') return 'Están empatados en goles. No hay empates: sumá el gol de oro del overtime.';
+  if (!isPlayed(m)) return 'Elegí el equipo ganador.';
+  if (byGoals !== null && byGoals !== m.winner) return 'El ganador tiene que ser el equipo con más goles.';
   return null;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RocketLeagueMatch } from '../model/types';
-import { award, rocketLeagueStandings, winnerWarning } from './rlStandings';
+import { award, resultError, rocketLeagueStandings } from './rlStandings';
 
 let n = 0;
 function match(team1: string[], team2: string[], winner?: 1 | 2, stats: RocketLeagueMatch['stats'] = {}): RocketLeagueMatch {
@@ -54,9 +54,12 @@ describe('tabla', () => {
     expect(award(rocketLeagueStandings(['A'], [], []), 'goals')).toBeNull();
   });
 
-  it('avisa si los goles contradicen al ganador', () => {
-    expect(winnerWarning(match(['A'], ['B'], 1, { B: { goals: 1, saves: 0 } }))).toMatch(/menos goles/);
-    expect(winnerWarning(match(['A'], ['B'], 1, { A: { goals: 1, saves: 0 }, B: { goals: 1, saves: 0 } }))).toMatch(/gol de oro/);
-    expect(winnerWarning(match(['A'], ['B'], 1))).toBeNull();
+  it('no acepta resultados empatados ni ganadores con menos goles', () => {
+    expect(resultError(match(['A'], ['B'], 1, { B: { goals: 1, saves: 0 } }))).toMatch(/más goles/);
+    expect(resultError(match(['A'], ['B'], 1, { A: { goals: 1, saves: 0 }, B: { goals: 1, saves: 0 } }))).toMatch(/gol de oro/);
+    expect(resultError(match(['A'], ['B'], undefined, { A: { goals: 2, saves: 0 }, B: { goals: 2, saves: 0 } }))).toMatch(/gol de oro/);
+    expect(resultError(match(['A'], ['B']))).toMatch(/Elegí/);
+    expect(resultError(match(['A'], ['B'], 1))).toBeNull();
+    expect(resultError(match(['A'], ['B'], 2, { B: { goals: 1, saves: 0 } }))).toBeNull();
   });
 });
