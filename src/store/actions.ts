@@ -1,4 +1,5 @@
 // Funciones puras que transforman los datos. El store solo las aplica y guarda.
+import { initialMatches, syncAfterChange } from '../games/rlMatches';
 import { pickColor } from '../model/colors';
 import { proposeFormat } from '../model/format';
 import { newId, shuffle } from '../model/random';
@@ -62,7 +63,7 @@ export function createTournament(
   random: () => number = Math.random,
 ): [AppData, Tournament] {
   if (input.playerIds.length < 2) throw new Error('Hacen falta al menos 2 jugadores.');
-  const tournament: Tournament = {
+  const base: Tournament = {
     id: newId(),
     name: input.name?.trim() || defaultTournamentName(input.game),
     game: input.game,
@@ -70,19 +71,34 @@ export function createTournament(
     status: 'active',
     playerIds: shuffle(input.playerIds, random),
     format: input.format ?? proposeFormat(input.game, input.playerIds.length),
+    rlMatches: [],
   };
+  const tournament: Tournament = { ...base, rlMatches: initialMatches(base) };
   return [{ ...data, tournaments: [tournament, ...data.tournaments] }, tournament];
 }
 
 export function updateTournament(
   data: AppData,
   id: string,
-  patch: Partial<Omit<Tournament, 'id' | 'game'>>,
+  patch: Partial<Omit<Tournament, 'id' | 'game' | 'format' | 'playerIds'>>,
 ): AppData {
+  return mapTournament(data, id, (t) => ({ ...t, ...patch }));
+}
+
+/** Aplica un cambio a un torneo. */
+export function mapTournament(data: AppData, id: string, fn: (t: Tournament) => Tournament): AppData {
   return {
     ...data,
-    tournaments: data.tournaments.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    tournaments: data.tournaments.map((t) => (t.id === id ? fn(t) : t)),
   };
+}
+
+/** Cambia el formato; en Rocket League se ajustan los partidos pendientes. */
+export function setTournamentFormat(data: AppData, id: string, format: TournamentFormat): AppData {
+  return mapTournament(data, id, (t) => {
+    if (format.game !== t.game) throw new Error('El formato no corresponde al juego.');
+    return syncAfterChange(t, { ...t, format });
+  });
 }
 
 export function setTournamentPlayers(data: AppData, id: string, playerIds: string[]): AppData {
@@ -92,13 +108,13 @@ export function setTournamentPlayers(data: AppData, id: string, playerIds: strin
   // Se respeta el orden sorteado de los que siguen; los nuevos van al final.
   const kept = t.playerIds.filter((p) => playerIds.includes(p));
   const added = playerIds.filter((p) => !t.playerIds.includes(p));
-  return updateTournament(data, id, { playerIds: [...kept, ...added] });
+  return mapTournament(data, id, (t) => syncAfterChange(t, { ...t, playerIds: [...kept, ...added] }));
 }
 
 export function reshufflePlayers(data: AppData, id: string, random: () => number = Math.random) {
   const t = data.tournaments.find((x) => x.id === id);
   if (!t) return data;
-  return updateTournament(data, id, { playerIds: shuffle(t.playerIds, random) });
+  return mapTournament(data, id, (t) => ({ ...t, playerIds: shuffle(t.playerIds, random) }));
 }
 
 export function finishTournament(data: AppData, id: string): AppData {

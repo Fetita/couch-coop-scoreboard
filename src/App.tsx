@@ -1,4 +1,5 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { MatchPage } from './pages/MatchPage';
 import { NewTournamentPage } from './pages/NewTournamentPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -14,6 +15,7 @@ export function App() {
           <Route path="/" element={<TournamentsPage />} />
           <Route path="/nuevo" element={<NewTournamentPage />} />
           <Route path="/torneo/:id" element={<TournamentPage />} />
+          <Route path="/torneo/:id/partido/:matchId" element={<MatchPage />} />
           <Route path="/jugadores" element={<PlayersPage />} />
           <Route path="/ajustes" element={<SettingsPage />} />
         </Routes>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FormatEditor } from '../components/FormatEditor';
 import { PlayerChip } from '../components/PlayerChip';
 import { PlayerPicker } from '../components/PlayerPicker';
+import { RocketLeagueSection } from '../components/RocketLeagueSection';
 import { describeFormat } from '../model/format';
 import { GAMES } from '../model/games';
 import type { TournamentFormat } from '../model/types';
@@ -11,6 +12,7 @@ import {
   finishTournament,
   reopenTournament,
   reshufflePlayers,
+  setTournamentFormat,
   setTournamentPlayers,
   updateTournament,
 } from '../store/actions';
@@ -41,6 +43,7 @@ export function TournamentPage() {
     .map((pid) => data.players.find((p) => p.id === pid))
     .filter((p) => p !== undefined);
   const finished = tournament.status === 'finished';
+  const playerMap = new Map(data.players.map((p) => [p.id, p]));
 
   const save = (fn: Parameters<typeof update>[0]) => {
     try {
@@ -78,6 +81,15 @@ export function TournamentPage() {
       </header>
 
       {error && <p className="error">{error}</p>}
+
+      {tournament.game === 'rocket-league' ? (
+        <RocketLeagueSection tournament={tournament} players={playerMap} />
+      ) : (
+        <section className="card stack">
+          <h2>Carreras</h2>
+          <p className="muted">Las carreras guiadas en vivo y la tabla llegan en la próxima versión.</p>
+        </section>
+      )}
 
       <section className="card stack">
         <div className="section-head">
@@ -131,7 +143,7 @@ export function TournamentPage() {
             <FormatEditor format={draftFormat} players={players.length} onChange={setDraftFormat} />
             <div className="row">
               <button type="button" className="btn" onClick={() => setEditing('none')}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={() => save((d) => updateTournament(d, tournament.id, { format: draftFormat }))}>
+              <button type="button" className="btn btn-primary" onClick={() => save((d) => setTournamentFormat(d, tournament.id, draftFormat))}>
                 Guardar
               </button>
             </div>
@@ -141,14 +153,6 @@ export function TournamentPage() {
         )}
       </section>
 
-      <section className="card stack">
-        <h2>{tournament.game === 'rocket-league' ? 'Partidos' : 'Carreras'}</h2>
-        <p className="muted">
-          {tournament.game === 'rocket-league'
-            ? 'La rotación de partidos, los resultados y la tabla llegan en la próxima versión.'
-            : 'Las carreras guiadas en vivo y la tabla llegan en una próxima versión.'}
-        </p>
-      </section>
 
       <section className="stack">
         {finished ? (
