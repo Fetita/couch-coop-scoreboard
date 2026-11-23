@@ -7,6 +7,7 @@ import {
   TIEBREAKER_LABELS,
 } from '../model/format';
 import type { RocketLeagueTiebreaker, TournamentFormat } from '../model/types';
+import { Icon } from '../ui/Icon';
 import { Stepper } from './Stepper';
 
 /** Editor del formato propuesto. Se usa al crear el torneo y durante el torneo. */
@@ -94,7 +95,7 @@ export function FormatEditor({ format, players, onChange }: {
       ))}
       {JSON.stringify(proposal) !== JSON.stringify(format) && (
         <button type="button" className="link" onClick={() => onChange(proposal)}>
-          Volver a la propuesta para {players} jugadores
+          <Icon name="shuffle" size={16} /> Volver a la propuesta para {players} jugadores
         </button>
       )}
     </div>
@@ -126,18 +127,18 @@ function TiebreakerEditor({ value, onChange }: {
     <div className="stack-sm">
       {value.map((t, i) => (
         <div key={t} className="tiebreak">
-          <span>{i + 1}. {TIEBREAKER_LABELS[t]}</span>
+          <span><strong>{i + 1}.</strong> {TIEBREAKER_LABELS[t]}</span>
           <span className="row-sm">
-            <button type="button" className="icon" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir">↑</button>
-            <button type="button" className="icon" disabled={i === value.length - 1} onClick={() => move(i, 1)} aria-label="Bajar">↓</button>
-            <button type="button" className="icon" onClick={() => onChange(value.filter((x) => x !== t))} aria-label="Quitar">✕</button>
+            <button type="button" className="icon-btn sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir"><Icon name="back" size={16} className="rot90" /></button>
+            <button type="button" className="icon-btn sm" disabled={i === value.length - 1} onClick={() => move(i, 1)} aria-label="Bajar"><Icon name="chevron" size={16} className="rot90" /></button>
+            <button type="button" className="icon-btn sm" onClick={() => onChange(value.filter((x) => x !== t))} aria-label="Quitar"><Icon name="x" size={16} /></button>
           </span>
         </div>
       ))}
       {value.length === 0 && <p className="muted">Sin desempate: los empatados comparten puesto.</p>}
       {unused.map((t) => (
         <button key={t} type="button" className="link" onClick={() => onChange([...value, t])}>
-          + {TIEBREAKER_LABELS[t]}
+          <Icon name="plus" size={16} /> {TIEBREAKER_LABELS[t]}
         </button>
       ))}
     </div>

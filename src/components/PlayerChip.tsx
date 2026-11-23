@@ -1,15 +1,19 @@
 import type { Player } from '../model/types';
+import { Avatar } from '../ui/Avatar';
+import { Icon } from '../ui/Icon';
 
-export function PlayerChip({ player, onClick, selected }: {
+export function PlayerChip({ player, onClick, selected, color }: {
   player: Player;
   onClick?: () => void;
   selected?: boolean;
+  color?: string;
 }) {
   const className = `chip${selected === undefined ? '' : selected ? ' chip-on' : ' chip-off'}`;
   const content = (
     <>
-      <span className="dot" style={{ background: player.color }} />
+      <Avatar player={player} size={30} color={color} />
       {player.name}
+      {selected && <span className="check"><Icon name="check" size={13} /></span>}
     </>
   );
   return onClick ? (
