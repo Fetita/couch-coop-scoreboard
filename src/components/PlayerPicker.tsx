@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { addPlayer } from '../store/actions';
 import { update, useData } from '../store/store';
+import { Icon } from '../ui/Icon';
 import { PlayerChip } from './PlayerChip';
 
 /** Elegir jugadores de la lista guardada o crear uno nuevo en el momento. */
@@ -47,7 +48,7 @@ export function PlayerPicker({ selected, onChange }: {
       )}
       <form className="row" onSubmit={add}>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jugador nuevo" aria-label="Nombre del jugador nuevo" />
-        <button type="submit" className="btn" disabled={!name.trim()}>Agregar</button>
+        <button type="submit" className="btn" disabled={!name.trim()}><Icon name="plus" size={18} />Agregar</button>
       </form>
       {error && <p className="error">{error}</p>}
     </div>

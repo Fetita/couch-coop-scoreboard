@@ -1,37 +1,53 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { raceState } from '../games/tmRace';
+import { formatTime, raceState } from '../games/tmRace';
 import { carModes, createRace, trackmaniaStandings, tracksForMode } from '../games/tmTournament';
-import { carColor } from '../model/colors';
+import { carColor, hasCarColor } from '../model/colors';
 import type { Player, Tournament, TrackmaniaFormat } from '../model/types';
-import { updatePlayer } from '../store/actions';
+import { setCarColor } from '../store/actions';
 import { update, useData } from '../store/store';
+import { Avatar, PlayerName } from '../ui/Avatar';
+import { Icon } from '../ui/Icon';
+import { Podium } from '../ui/Podium';
+import { RankTable } from '../ui/RankTable';
 import { ColorPicker } from './ColorPicker';
 
-export function TrackmaniaSection({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
+export function TmPlay({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
   const data = useData();
   const format = tournament.format as TrackmaniaFormat;
   const tracks = new Map(data.tmTracks.map((t) => [t.id, t]));
-  const [modeFilter, setModeFilter] = useState<string | null>(null);
   const finished = tournament.status === 'finished';
   const running = tournament.tmRaces.find((r) => !raceState(r).finished);
-  const usedModes = [...new Set(tournament.tmRaces.map((r) => r.carMode))];
-  const rows = trackmaniaStandings(tournament, modeFilter ?? undefined);
-  const done = tournament.tmRaces.filter((r) => raceState(r).finished).length;
+  const runningState = running ? raceState(running) : null;
+  const nextRunner = runningState?.next ? players.get(runningState.next) : undefined;
+  const colorOf = (p?: Player) => carColor(tournament, p);
+
+  const missing = tournament.playerIds.filter((id) => !hasCarColor(tournament, id));
 
   return (
     <>
-      {running && (
-        <section className="card stack next-match">
-          <div className="section-head">
+      {missing.length > 0 && !finished && (
+        <p className="fuel-out">
+          <Icon name="car" size={18} />
+          Falta el color de auto de {missing.map((id) => players.get(id)?.name).join(', ')}. Elegilo en Ajustes.
+        </p>
+      )}
+      {running && runningState && (
+        <section className="card highlight">
+          <div className="card-head">
             <h2>Carrera en curso</h2>
-            <span className="muted">{tracks.get(running.trackId)?.name} · {running.carMode}</span>
+            <span className="pill live">{tracks.get(running.trackId)?.name} · {running.carMode}</span>
           </div>
-          <p className="big-runner">
-            Corre <strong>{players.get(raceState(running).next ?? '')?.name}</strong>
-          </p>
+          <div className="runner">
+            <span className="runner-label">{runningState.firstLap ? 'Primera vuelta' : 'Eliminación'} · le toca a</span>
+            <span className="runner-name">
+              <span className="car-swatch" style={{ background: colorOf(nextRunner) }} />
+              {nextRunner?.name}
+            </span>
+            <span className="hint">{runningState.standing.length} en carrera · {runningState.eliminated.length} afuera</span>
+          </div>
           <Link to={`/torneo/${tournament.id}/carrera/${running.id}`} className="btn btn-primary btn-block">
-            Ir a la carrera
+            <Icon name="play" size={18} />Ir a la carrera
           </Link>
         </section>
       )}
@@ -39,69 +55,32 @@ export function TrackmaniaSection({ tournament, players }: { tournament: Tournam
         <NewRace tournament={tournament} number={tournament.tmRaces.length + 1} planned={format.tracks} />
       )}
 
-      <section className="card stack">
-        <div className="section-head">
-          <h2>Tabla</h2>
-          <span className="muted">{done} de {format.tracks} pistas</span>
-        </div>
-        {usedModes.length > 1 && (
-          <div className="chips">
-            <button type="button" className={`chip ${modeFilter === null ? 'chip-on' : ''}`} onClick={() => setModeFilter(null)}>Todos</button>
-            {usedModes.map((m) => (
-              <button key={m} type="button" className={`chip ${modeFilter === m ? 'chip-on' : ''}`} onClick={() => setModeFilter(m)}>{m}</button>
-            ))}
-          </div>
-        )}
-        <table className="standings">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th className="left">Jugador</th>
-              <th title="Puntos">Pts</th>
-              <th title="Carreras terminadas">Carr</th>
-              <th title="Carreras ganadas">1°</th>
-              <th title="Podios">Pod</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const p = players.get(r.playerId);
-              return (
-                <tr key={r.playerId}>
-                  <td>{r.position}</td>
-                  <td className="left">
-                    <span className="name-cell"><span className="dot" style={{ background: carColor(p) }} /> {p?.name ?? '?'}</span>
-                  </td>
-                  <td className="strong">{r.points}</td>
-                  <td>{r.races}</td>
-                  <td>{r.wins}</td>
-                  <td>{r.podiums}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <p className="hint">Puntos por puesto: {format.pointsScale.join('-')}</p>
-      </section>
-
-      <CarColors tournament={tournament} players={players} />
-
       {tournament.tmRaces.length > 0 && (
-        <section className="card stack">
-          <h2>Carreras</h2>
-          <ol className="match-list">
+        <section className="card">
+          <div className="card-head">
+            <h2>Carreras</h2>
+            <span className="hint">{tournament.tmRaces.filter((r) => raceState(r).finished).length} de {format.tracks} pistas</span>
+          </div>
+          <ol className="list" style={{ gap: 6 }}>
             {tournament.tmRaces.map((r, i) => {
               const st = raceState(r);
+              const winner = st.winner ? players.get(st.winner) : undefined;
               return (
                 <li key={r.id}>
                   <Link to={`/torneo/${tournament.id}/carrera/${r.id}`} className={`race-row${st.finished ? '' : ' is-next'}`}>
                     <span className="match-num">{i + 1}</span>
-                    <span className="grow">
-                      <strong>{tracks.get(r.trackId)?.name ?? '?'}</strong> <span className="muted">· {r.carMode}</span>
+                    <span className="grow stack-sm" style={{ gap: 2 }}>
+                      <strong>{tracks.get(r.trackId)?.name ?? '?'}</strong>
+                      <span className="hint">{r.carMode}{st.finished && st.winner ? ` · ${formatTime(st.best.get(st.winner))}` : ''}</span>
                     </span>
-                    <span>
-                      {st.finished ? <>🏆 {players.get(st.winner!)?.name}</> : <span className="muted">en curso</span>}
-                    </span>
+                    {st.finished && winner ? (
+                      <span className="row" style={{ gap: 6 }}>
+                        <Icon name="trophy" size={16} className="trophy" />
+                        <Avatar player={winner} size={26} color={colorOf(winner)} />
+                      </span>
+                    ) : (
+                      <span className="pill live">En curso</span>
+                    )}
                   </Link>
                 </li>
               );
@@ -109,6 +88,51 @@ export function TrackmaniaSection({ tournament, players }: { tournament: Tournam
           </ol>
         </section>
       )}
+    </>
+  );
+}
+
+export function TmTable({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
+  const format = tournament.format as TrackmaniaFormat;
+  const [modeFilter, setModeFilter] = useState<string | null>(null);
+  const usedModes = [...new Set(tournament.tmRaces.map((r) => r.carMode))];
+  const rows = trackmaniaStandings(tournament, modeFilter ?? undefined);
+  const anyFinished = rows.some((r) => r.races > 0);
+  const colorOf = (p?: Player) => carColor(tournament, p);
+
+  return (
+    <>
+      {usedModes.length > 1 && (
+        <div className="filter-row">
+          <button type="button" className={`chip text-only ${modeFilter === null ? 'chip-on' : ''}`} onClick={() => setModeFilter(null)}>Todos los modos</button>
+          {usedModes.map((m) => (
+            <button key={m} type="button" className={`chip text-only ${modeFilter === m ? 'chip-on' : ''}`} onClick={() => setModeFilter(m)}>{m}</button>
+          ))}
+        </div>
+      )}
+      {anyFinished && (
+        <section className="card">
+          <Podium players={players} colorOf={colorOf} spots={rows.slice(0, 3).map((r) => ({ playerId: r.playerId, value: `${r.points} pts` }))} />
+        </section>
+      )}
+      <section className="card">
+        <div className="card-head">
+          <h2>Tabla</h2>
+          <span className="hint">Puntos por puesto: {format.pointsScale.join('-')}</span>
+        </div>
+        <RankTable
+          rows={rows}
+          players={players}
+          colorOf={colorOf}
+          link
+          columns={[
+            { label: 'Pts', title: 'Puntos', value: (r) => r.points, strong: true },
+            { label: 'Carr', title: 'Carreras terminadas', value: (r) => r.races },
+            { label: '1°', title: 'Carreras ganadas', value: (r) => r.wins },
+            { label: 'Pod', title: 'Podios', value: (r) => r.podiums },
+          ]}
+        />
+      </section>
     </>
   );
 }
@@ -141,18 +165,20 @@ function NewRace({ tournament, number, planned }: { tournament: Tournament; numb
   };
 
   return (
-    <section className="card stack">
-      <div className="section-head">
+    <section className="card highlight">
+      <div className="card-head">
         <h2>Nueva carrera</h2>
-        <span className="muted">pista {number}{number <= planned ? ` de ${planned}` : ''}</span>
+        <span className="pill">Pista {number}{number <= planned ? ` de ${planned}` : ''}</span>
       </div>
       <div className="field">
         <div className="field-label">1. Modo de auto</div>
         <div className="chips">
           {modes.map((m) => (
-            <button key={m} type="button" className={`chip ${mode === m ? 'chip-on' : ''}`} onClick={() => { setMode(m); setTrack(''); }}>{m}</button>
+            <button key={m} type="button" className={`chip text-only ${mode === m ? 'chip-on' : ''}`} onClick={() => { setMode(m); setTrack(''); }}>
+              <Icon name="car" size={16} />{m}
+            </button>
           ))}
-          <button type="button" className={`chip ${mode === '__other' ? 'chip-on' : ''}`} onClick={() => { setMode('__other'); setTrack(''); }}>Otro…</button>
+          <button type="button" className={`chip text-only ${mode === '__other' ? 'chip-on' : ''}`} onClick={() => { setMode('__other'); setTrack(''); }}>Otro…</button>
         </div>
         {mode === '__other' && (
           <input value={customMode} onChange={(e) => setCustomMode(e.target.value)} placeholder="Nombre del modo" aria-label="Modo de auto" />
@@ -163,51 +189,79 @@ function NewRace({ tournament, number, planned }: { tournament: Tournament; numb
         {known.length > 0 && (
           <div className="chips">
             {known.map((t) => (
-              <button key={t.id} type="button" className={`chip ${track === t.name ? 'chip-on' : ''}`} onClick={() => setTrack(t.name)}>
-                {t.name}{playedHere.has(t.id) ? ' ✓' : ''}
+              <button key={t.id} type="button" className={`chip text-only ${track === t.name ? 'chip-on' : ''}`} onClick={() => setTrack(t.name)}>
+                {t.name}{playedHere.has(t.id) && <Icon name="check" size={14} />}
               </button>
             ))}
           </div>
         )}
         <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder={known.length ? 'O escribí una nueva' : 'Nombre de la pista'} aria-label="Pista" />
-        {known.length > 0 && <div className="hint">✓ = ya se corrió en este torneo.</div>}
+        {known.length > 0 && <div className="hint">Con ✓ las que ya se corrieron en este torneo.</div>}
       </div>
       {error && <p className="error">{error}</p>}
       <button type="button" className="btn btn-primary btn-block" disabled={!effectiveMode || !track.trim()} onClick={start}>
-        Empezar carrera
+        <Icon name="flag" size={18} />Empezar carrera
       </button>
     </section>
   );
 }
 
-/** Cada jugador elige el color de su auto, como en el juego. */
-function CarColors({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
+/** El color de auto que el juego le asignó a cada uno (sale al azar en cada partida). */
+export function CarColors({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
-    <section className="card stack">
-      <div className="section-head">
+    <section className="card">
+      <div className="card-head">
         <h2>Autos</h2>
-        <span className="hint">Tocá un jugador para cambiar su color</span>
+        <span className="hint">El color que le tocó a cada uno</span>
       </div>
-      <div className="stack-sm">
-        {tournament.playerIds.map((id) => {
-          const p = players.get(id);
-          if (!p) return null;
-          return (
-            <div key={id} className="stack-sm">
-              <button type="button" className={`car-row${editing === id ? ' on' : ''}`} onClick={() => setEditing(editing === id ? null : id)}>
-                <span className="car-swatch" style={{ background: carColor(p) }} />
-                <span className="grow">{p.name}</span>
-                <span className="hint">{editing === id ? 'Listo' : 'Cambiar'}</span>
-              </button>
-              {editing === id && (
-                <ColorPicker label={`Color del auto de ${p.name}`} value={carColor(p)}
-                  onChange={(c) => update((d) => updatePlayer(d, id, { carColor: c }))} />
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <CarColorList
+        playerIds={tournament.playerIds}
+        players={players}
+        colors={tournament.carColors ?? {}}
+        editing={editing}
+        setEditing={setEditing}
+        onChange={(id, c) => update((d) => setCarColor(d, tournament.id, id, c))}
+      />
     </section>
+  );
+}
+
+/** Lista de jugadores con el color de su auto. Se usa al crear el torneo y en sus ajustes. */
+export function CarColorList({ playerIds, players, colors, editing, setEditing, onChange }: {
+  playerIds: string[];
+  players: Map<string, Player>;
+  colors: Record<string, string>;
+  editing: string | null;
+  setEditing: (id: string | null) => void;
+  onChange: (playerId: string, color: string) => void;
+}) {
+  return (
+    <div className="stack-sm">
+      {playerIds.map((id) => {
+        const p = players.get(id);
+        if (!p) return null;
+        const color = colors[id];
+        return (
+          <div key={id} className="stack-sm">
+            <button type="button" className={`car-row${editing === id ? ' on' : ''}`} onClick={() => setEditing(editing === id ? null : id)}>
+              {color ? <span className="car-swatch" style={{ background: color }} /> : <span className="car-swatch empty">?</span>}
+              <PlayerName player={p} size={26} />
+              <span className="grow" />
+              <span className="hint">{editing === id ? 'Listo' : color ? 'Cambiar' : 'Elegir color'}</span>
+            </button>
+            {editing === id && (
+              <ColorPicker label={`Color del auto de ${p.name}`} value={color ?? p.color}
+                onChange={(c) => {
+                  onChange(id, c);
+                  // Pasa solo al siguiente que falta, para cargar todos rápido.
+                  const nextMissing = playerIds.find((x) => x !== id && !colors[x]);
+                  setEditing(nextMissing ?? null);
+                }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -22,7 +22,18 @@ export function pickColor(used: string[]): string {
   return best;
 }
 
-/** Color del auto de un jugador en Trackmania. */
-export function carColor(player: { color: string; carColor?: string } | undefined): string {
-  return player?.carColor ?? player?.color ?? '#666';
+/**
+ * Color del auto de un jugador en un torneo de Trackmania. En el juego los colores
+ * salen al azar, así que se eligen al arrancar cada torneo; si falta, se usa el del jugador.
+ */
+export function carColor(
+  tournament: { carColors?: Record<string, string> } | undefined,
+  player: { id: string; color: string } | undefined,
+): string {
+  if (!player) return '#666';
+  return tournament?.carColors?.[player.id] ?? player.color;
+}
+
+export function hasCarColor(tournament: { carColors?: Record<string, string> }, playerId: string): boolean {
+  return Boolean(tournament.carColors?.[playerId]);
 }

@@ -132,3 +132,24 @@ describe('tabla general', () => {
     expect(generalStandings(d, 'rocket-league').every((r) => r.tmPoints === 0)).toBe(true);
   });
 });
+
+describe('color de auto por torneo', () => {
+  it('se elige al crear el torneo y se puede cambiar', async () => {
+    const { setCarColor } = await import('../store/actions');
+    const { carColor } = await import('../model/colors');
+    let d = emptyData();
+    for (const n of ['A', 'B']) d = addPlayer(d, n)[0];
+    const [a, b] = d.players;
+    let t;
+    [d, t] = createTournament(d, { game: 'trackmania', playerIds: [a.id, b.id], carColors: { [a.id]: '#ff0000' } });
+    expect(carColor(t, a)).toBe('#ff0000');
+    expect(carColor(t, b)).toBe(b.color);
+    d = setCarColor(d, t.id, b.id, '#00ff00');
+    expect(carColor(d.tournaments[0], b)).toBe('#00ff00');
+    // Cada torneo tiene sus propios colores.
+    let t2;
+    [d, t2] = createTournament(d, { game: 'trackmania', playerIds: [a.id, b.id], carColors: { [a.id]: '#0000ff' } });
+    expect(carColor(t2, a)).toBe('#0000ff');
+    expect(carColor(d.tournaments.find((x) => x.id === t.id), a)).toBe('#ff0000');
+  });
+});

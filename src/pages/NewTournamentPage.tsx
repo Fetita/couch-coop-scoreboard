@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FormatEditor } from '../components/FormatEditor';
 import { PlayerPicker } from '../components/PlayerPicker';
-import { proposeFormat } from '../model/format';
+import { CarColorList } from '../components/TrackmaniaSection';
+import { describeFormat, proposeFormat } from '../model/format';
 import { GAME_LIST, GAMES } from '../model/games';
 import type { GameId, TournamentFormat } from '../model/types';
 import { createTournament, defaultTournamentName } from '../store/actions';
-import { update } from '../store/store';
+import { update, useData } from '../store/store';
+import { Icon } from '../ui/Icon';
+import { PageHeader } from '../ui/PageHeader';
 
 type Step = 'game' | 'players' | 'format';
+const ORDER: Step[] = ['game', 'players', 'format'];
 
 export function NewTournamentPage() {
   const navigate = useNavigate();
@@ -16,16 +20,19 @@ export function NewTournamentPage() {
   const [game, setGame] = useState<GameId | null>(null);
   const [playerIds, setPlayerIds] = useState<string[]>([]);
   const [format, setFormat] = useState<TournamentFormat | null>(null);
+  const [formatFor, setFormatFor] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [carColors, setCarColors] = useState<Record<string, string>>({});
+  const [editingCar, setEditingCar] = useState<string | null>(null);
+  const data = useData();
+  const players = new Map(data.players.map((p) => [p.id, p]));
 
   const chooseGame = (g: GameId) => {
+    if (g !== game) setName(defaultTournamentName(g));
     setGame(g);
-    setName(defaultTournamentName(g));
     setStep('players');
   };
-
-  const [formatFor, setFormatFor] = useState('');
 
   const toFormat = () => {
     // La propuesta se recalcula solo si cambió el juego o la cantidad de jugadores,
@@ -42,7 +49,7 @@ export function NewTournamentPage() {
     try {
       let id = '';
       update((d) => {
-        const [next, t] = createTournament(d, { game: game!, name, playerIds, format: format! });
+        const [next, t] = createTournament(d, { game: game!, name, playerIds, format: format!, carColors });
         id = t.id;
         return next;
       });
@@ -52,46 +59,49 @@ export function NewTournamentPage() {
     }
   };
 
+  const missingColors = game === 'trackmania' ? playerIds.filter((id) => !carColors[id]).length : 0;
+  const canPlayers = game !== null;
+  const canFormat = game !== null && playerIds.length >= 2;
+  const stepIndex = ORDER.indexOf(step);
+  const theme = game ? GAMES[game].theme : '';
+
   return (
-    <div className="page">
-      <header className="page-header">
-        {step === 'game' ? (
-          <Link to="/" className="back">‹ Torneos</Link>
-        ) : (
-          <button type="button" className="back" onClick={() => setStep(step === 'format' ? 'players' : 'game')}>‹ Atrás</button>
-        )}
-        <h1>Nuevo torneo</h1>
-        <ol className="steps" aria-label="Pasos">
-          {([
-            ['game', 'Juego', true],
-            ['players', 'Jugadores', game !== null],
-            ['format', 'Formato', game !== null && playerIds.length >= 2],
-          ] as const).map(([id, label, enabled]) => (
-            <li key={id}>
-              <button
-                type="button"
-                className={step === id ? 'on' : ''}
-                disabled={!enabled}
-                aria-current={step === id ? 'step' : undefined}
-                onClick={() => (id === 'format' ? (step !== 'format' && toFormat()) : setStep(id))}
-              >
-                {label}
-              </button>
-            </li>
-          ))}
-        </ol>
-      </header>
+    <div className={`page ${theme}`}>
+      <PageHeader
+        title="Nuevo torneo"
+        back={step === 'game' ? { to: '/', label: 'Torneos' } : { onClick: () => setStep(ORDER[stepIndex - 1]), label: 'Atrás' }}
+      />
+      <ol className="steps" aria-label="Pasos">
+        {([
+          ['game', 'Juego', true],
+          ['players', 'Jugadores', canPlayers],
+          ['format', 'Formato', canFormat],
+        ] as const).map(([id, label, enabled], i) => (
+          <li key={id}>
+            <button
+              type="button"
+              className={step === id ? 'on' : i < stepIndex ? 'done' : ''}
+              disabled={!enabled}
+              aria-current={step === id ? 'step' : undefined}
+              onClick={() => (id === 'format' ? step !== 'format' && toFormat() : setStep(id))}
+            >
+              {i + 1}. {label}
+            </button>
+          </li>
+        ))}
+      </ol>
 
       {step === 'game' && (
-        <ul className="cards">
+        <ul className="list">
           {GAME_LIST.map((g) => (
             <li key={g.id}>
-              <button type="button" className="card card-link" onClick={() => chooseGame(g.id)}>
-                <span className="card-emoji">{g.emoji}</span>
-                <span className="card-body">
+              <button type="button" className={`game-tile ${g.theme}`} onClick={() => chooseGame(g.id)}>
+                <span className="game-badge lg">{g.short}</span>
+                <span className="stack-sm grow">
                   <strong>{g.name}</strong>
-                  <span className="muted">{g.description}</span>
+                  <span className="desc">{g.description}</span>
                 </span>
+                <Icon name="chevron" />
               </button>
             </li>
           ))}
@@ -99,36 +109,77 @@ export function NewTournamentPage() {
       )}
 
       {step === 'players' && game && (
-        <section className="stack">
-          <h2>¿Quiénes juegan? <span className="count">{playerIds.length}</span></h2>
-          <PlayerPicker selected={playerIds} onChange={setPlayerIds} />
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            disabled={playerIds.length < GAMES[game].minPlayers}
-            onClick={toFormat}
-          >
-            Siguiente
-          </button>
-          <p className="hint">El orden se sortea al crear el torneo.</p>
-        </section>
+        <>
+          <section className="card">
+            <div className="card-head">
+              <h2>¿Quiénes juegan? <span className="count">{playerIds.length}</span></h2>
+              {playerIds.length > 0 && (
+                <button type="button" className="link" onClick={() => setPlayerIds([])}>Ninguno</button>
+              )}
+            </div>
+            <PlayerPicker selected={playerIds} onChange={setPlayerIds} />
+            <p className="hint">Tocá para elegir. El orden se sortea al crear el torneo.</p>
+          </section>
+          <div className="actionbar">
+            <div className="actionbar-inner">
+              <button type="button" className="btn btn-primary btn-block" disabled={playerIds.length < GAMES[game].minPlayers} onClick={toFormat}>
+                {playerIds.length < 2 ? 'Elegí al menos 2 jugadores' : `Seguir con ${playerIds.length} jugadores`}
+              </button>
+            </div>
+          </div>
+          <div style={{ height: 70 }} />
+        </>
       )}
 
       {step === 'format' && game && format && (
-        <section className="stack">
-          <label className="field">
-            <span className="field-label">Nombre</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <p className="muted">
-            Propuesta para {playerIds.length} jugadores en {GAMES[game].name}. Cambiá lo que quieras; también se puede ajustar durante el torneo.
-          </p>
-          <FormatEditor format={format} players={playerIds.length} onChange={setFormat} />
+        <>
+          <section className="card">
+            <label className="field">
+              <span className="field-label">Nombre del torneo</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+          </section>
+          <section className="card">
+            <div className="card-head">
+              <h2>Formato</h2>
+              <span className="hint">{describeFormat(format)}</span>
+            </div>
+            <p className="muted small">
+              Propuesta para {playerIds.length} jugadores. Cambiá lo que quieras; también se puede ajustar durante el torneo.
+            </p>
+            <FormatEditor format={format} players={playerIds.length} onChange={setFormat} />
+          </section>
+          {game === 'trackmania' && (
+            <section className="card">
+              <div className="card-head">
+                <h2>Color de cada auto</h2>
+                <span className="hint">{missingColors ? `Faltan ${missingColors}` : 'Listo'}</span>
+              </div>
+              <p className="muted small">En el juego los colores salen al azar: elegí el que le tocó a cada uno.</p>
+              <CarColorList
+                playerIds={playerIds}
+                players={players}
+                colors={carColors}
+                editing={editingCar}
+                setEditing={setEditingCar}
+                onChange={(id, c) => setCarColors((x) => ({ ...x, [id]: c }))}
+              />
+            </section>
+          )}
           {error && <p className="error">{error}</p>}
-          <button type="button" className="btn btn-primary btn-block" onClick={create}>
-            Crear torneo y sortear orden
-          </button>
-        </section>
+          <div className="actionbar">
+            <div className="actionbar-inner">
+              <button type="button" className="btn btn-primary btn-block" disabled={missingColors > 0} onClick={create}>
+                {missingColors > 0 ? (
+                  <>Falta el color de {missingColors} {missingColors === 1 ? 'auto' : 'autos'}</>
+                ) : (
+                  <><Icon name="shuffle" size={18} /> Crear torneo y sortear orden</>
+                )}
+              </button>
+            </div>
+          </div>
+          <div style={{ height: 70 }} />
+        </>
       )}
     </div>
   );

@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { TeamLine } from '../components/RocketLeagueSection';
 import { Stepper } from '../components/Stepper';
 import { clearResult, recordResult, removeMatch, setTeams } from '../games/rlMatches';
 import { goalsWinner, isPlayed, resultError, teamGoals } from '../games/rlStandings';
+import { GAMES } from '../model/games';
 import type { Player, RocketLeagueMatch, RocketLeagueStat } from '../model/types';
 import { mapTournament } from '../store/actions';
 import { update, useData } from '../store/store';
+import { Avatar, PlayerName } from '../ui/Avatar';
+import { Icon } from '../ui/Icon';
+import { PageHeader } from '../ui/PageHeader';
 
 type Side = 1 | 2 | 0; // 0 = descansa
+const TEAM_NAMES = { 1: 'Azul', 2: 'Naranja' } as const;
 
 export function MatchPage() {
   const { id, matchId } = useParams();
@@ -21,14 +25,16 @@ export function MatchPage() {
   if (!tournament || !match) {
     return (
       <div className="page">
-        <Link to={tournament ? `/torneo/${tournament.id}` : '/'} className="back">‹ Volver</Link>
+        <Link to={tournament ? `/torneo/${tournament.id}` : '/'} className="back"><Icon name="back" size={18} />Volver</Link>
         <p className="muted">Este partido no existe.</p>
       </div>
     );
   }
 
-  return <MatchEditor key={match.id} tournamentId={tournament.id} match={match} index={tournament.rlMatches.indexOf(match)}
-    playerIds={tournament.playerIds} players={players} onDone={() => navigate(`/torneo/${tournament.id}`)} />;
+  return (
+    <MatchEditor key={match.id} tournamentId={tournament.id} match={match} index={tournament.rlMatches.indexOf(match)}
+      playerIds={tournament.playerIds} players={players} onDone={() => navigate(`/torneo/${tournament.id}`)} />
+  );
 }
 
 function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }: {
@@ -73,42 +79,48 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
   };
 
   const team = (side: 1 | 2) => (
-    <div className={`card stack team-card${winner === side ? ' winner' : ''}`}>
-      <div className="section-head">
-        <h2>Equipo {side}</h2>
-        <span className="team-score">{side === 1 ? g1 : g2}</span>
+    <section className={`card team-card t${side}${winner === side ? ' winner' : ''}`}>
+      <div className="card-head">
+        <h2>Equipo {TEAM_NAMES[side]}</h2>
+        {winner === side && <span className="pill done"><Icon name="trophy" size={14} />Ganó</span>}
       </div>
       {(side === 1 ? match.team1 : match.team2).map((pid) => {
         const p = players.get(pid);
         return (
           <div key={pid} className="stat-row">
-            <span className="stat-name">
-              <span className="dot" style={{ background: p?.color }} /> {p?.name ?? '?'}
+            <PlayerName player={p} size={32} bold />
+            <span className="stat-cell">
+              <span className="hint"><Icon name="ball" size={12} />Goles</span>
+              <Stepper compact label={`goles de ${p?.name}`} value={stats[pid]?.goals ?? 0} onChange={(v) => setStat(pid, 'goals', v)} />
             </span>
             <span className="stat-cell">
-              <span className="hint">Goles</span>
-              <Stepper label={`goles de ${p?.name}`} value={stats[pid]?.goals ?? 0} onChange={(v) => setStat(pid, 'goals', v)} />
-            </span>
-            <span className="stat-cell">
-              <span className="hint">Saves</span>
-              <Stepper label={`saves de ${p?.name}`} value={stats[pid]?.saves ?? 0} onChange={(v) => setStat(pid, 'saves', v)} />
+              <span className="hint"><Icon name="glove" size={12} />Saves</span>
+              <Stepper compact label={`saves de ${p?.name}`} value={stats[pid]?.saves ?? 0} onChange={(v) => setStat(pid, 'saves', v)} />
             </span>
           </div>
         );
       })}
-    </div>
+    </section>
   );
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <Link to={`/torneo/${tournamentId}`} className="back">‹ Torneo</Link>
-        <h1>Partido {index + 1}</h1>
-        <p className="muted">
-          Ronda {match.round}
-          {match.resting.length > 0 && ` · descansa${match.resting.length > 1 ? 'n' : ''} ${match.resting.map((r) => players.get(r)?.name).join(', ')}`}
-        </p>
-      </header>
+    <div className={`page ${GAMES['rocket-league'].theme}`}>
+      <PageHeader
+        title={`Partido ${index + 1}`}
+        back={{ to: `/torneo/${tournamentId}`, label: 'Torneo' }}
+        subtitle={
+          <>
+            <span>Ronda {match.round}</span>
+            {match.resting.length > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                · descansa{match.resting.length > 1 ? 'n' : ''}
+                {match.resting.map((r) => <Avatar key={r} player={players.get(r)} size={20} />)}
+                {match.resting.map((r) => players.get(r)?.name).join(', ')}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {editingTeams ? (
         <TeamsEditor
@@ -126,15 +138,32 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
         />
       ) : (
         <>
+          <div className="scoreboard">
+            <div className={`score-side t1${winner === 1 ? ' win' : ''}`}>
+              <span className="team-label">{TEAM_NAMES[1]}</span>
+              <span className="score-num">{g1}</span>
+              <span className="avatar-stack">{match.team1.map((id) => <Avatar key={id} player={players.get(id)} size={26} />)}</span>
+            </div>
+            <span className="score-dash">–</span>
+            <div className={`score-side t2${winner === 2 ? ' win' : ''}`}>
+              <span className="team-label">{TEAM_NAMES[2]}</span>
+              <span className="score-num">{g2}</span>
+              <span className="avatar-stack">{match.team2.map((id) => <Avatar key={id} player={players.get(id)} size={26} />)}</span>
+            </div>
+          </div>
+
           {team(1)}
           {team(2)}
-          <section className="stack">
+
+          <section className="card">
             <h2>¿Quién ganó?</h2>
             <div className="winner-buttons">
               {([1, 2] as const).map((side) => (
-                <button key={side} type="button" className={`btn winner-btn${winner === side ? ' on' : ''}`} disabled={byGoals !== null} onClick={() => setWinner(side)}>
-                  <span>Equipo {side}</span>
-                  <TeamLine ids={side === 1 ? match.team1 : match.team2} players={players} />
+                <button key={side} type="button" className={`winner-btn t${side}${winner === side ? ' on' : ''}`} disabled={byGoals !== null} onClick={() => setWinner(side)}>
+                  <span className="avatar-stack">
+                    {(side === 1 ? match.team1 : match.team2).map((id) => <Avatar key={id} player={players.get(id)} size={30} />)}
+                  </span>
+                  Equipo {TEAM_NAMES[side]}
                 </button>
               ))}
             </div>
@@ -145,17 +174,12 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
             </p>
             {problem && (winner || byGoals === 'tie') && <p className="error">{problem}</p>}
             {error && <p className="error">{error}</p>}
-            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              disabled={problem !== null}
-              onClick={() => { if (run((t) => recordResult(t, match.id, winner!, stats))) onDone(); }}
-            >
-              Guardar resultado
-            </button>
           </section>
-          <section className="stack">
-            <button type="button" className="btn btn-block" onClick={() => setEditingTeams(true)}>Cambiar equipos</button>
+
+          <section className="stack-sm">
+            <button type="button" className="btn btn-block" onClick={() => setEditingTeams(true)}>
+              <Icon name="users" size={18} />Cambiar equipos
+            </button>
             {isPlayed(match) && (
               <button
                 type="button"
@@ -180,9 +204,24 @@ function MatchEditor({ tournamentId, match, index, playerIds, players, onDone }:
                 }
               }}
             >
-              Quitar partido
+              <Icon name="trash" size={18} />Quitar partido
             </button>
           </section>
+
+          <div style={{ height: 70 }} />
+          <div className="actionbar">
+            <div className="actionbar-inner">
+              <button
+                type="button"
+                className="btn btn-primary btn-block"
+                disabled={problem !== null}
+                onClick={() => { if (run((t) => recordResult(t, match.id, winner!, stats))) onDone(); }}
+              >
+                <Icon name="check" size={20} />
+                {problem && byGoals === 'tie' ? 'Falta el gol de oro' : !winner ? 'Elegí el ganador' : 'Guardar resultado'}
+              </button>
+            </div>
+          </div>
         </>
       )}
     </div>
@@ -205,15 +244,13 @@ function TeamsEditor({ match, playerIds, players, onCancel, onSave }: {
   const team2 = all.filter((p) => sides[p] === 2);
 
   return (
-    <section className="card stack">
+    <section className="card">
       <h2>Cambiar equipos</h2>
       {all.map((pid) => (
         <div key={pid} className="side-row">
-          <span className="stat-name">
-            <span className="dot" style={{ background: players.get(pid)?.color }} /> {players.get(pid)?.name ?? '?'}
-          </span>
+          <PlayerName player={players.get(pid)} size={28} bold />
           <div className="segmented">
-            {([[1, 'Eq. 1'], [2, 'Eq. 2'], [0, 'Descansa']] as const).map(([side, label]) => (
+            {([[1, TEAM_NAMES[1]], [2, TEAM_NAMES[2]], [0, 'Descansa']] as const).map(([side, label]) => (
               <button key={side} type="button" className={sides[pid] === side ? 'on' : ''} onClick={() => setSides({ ...sides, [pid]: side })}>
                 {label}
               </button>

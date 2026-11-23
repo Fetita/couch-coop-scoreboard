@@ -1,14 +1,23 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
-import { MatchPage } from './pages/MatchPage';
-import { NewTournamentPage } from './pages/NewTournamentPage';
 import { GeneralPage } from './pages/GeneralPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { MatchPage } from './pages/MatchPage';
+import { NewTournamentPage } from './pages/NewTournamentPage';
 import { PlayerStatsPage } from './pages/PlayerStatsPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { RacePage } from './pages/RacePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TournamentPage } from './pages/TournamentPage';
 import { TournamentsPage } from './pages/TournamentsPage';
+import { Icon, type IconName } from './ui/Icon';
+
+const TABS: [string, IconName, string][] = [
+  ['/', 'trophy', 'Torneos'],
+  ['/general', 'chart', 'General'],
+  ['/historial', 'clock', 'Historial'],
+  ['/jugadores', 'users', 'Jugadores'],
+  ['/ajustes', 'settings', 'Ajustes'],
+];
 
 // HashRouter: GitHub Pages no sabe redirigir rutas a index.html.
 export function App() {
@@ -28,12 +37,13 @@ export function App() {
           <Route path="/ajustes" element={<SettingsPage />} />
         </Routes>
       </main>
-      <nav className="tabbar">
-        <NavLink to="/" end>🏆<span>Torneos</span></NavLink>
-        <NavLink to="/general">📊<span>General</span></NavLink>
-        <NavLink to="/historial">📜<span>Historial</span></NavLink>
-        <NavLink to="/jugadores">👥<span>Jugadores</span></NavLink>
-        <NavLink to="/ajustes">⚙️<span>Ajustes</span></NavLink>
+      <nav className="tabbar" aria-label="Secciones">
+        {TABS.map(([to, icon, label]) => (
+          <NavLink key={to} to={to} end={to === '/'}>
+            <span className="tab-icon"><Icon name={icon} size={22} /></span>
+            {label}
+          </NavLink>
+        ))}
       </nav>
     </HashRouter>
   );

@@ -7,8 +7,6 @@ export interface Player {
   id: string;
   name: string;
   color: string;
-  /** Color del auto en Trackmania (si no se eligió, se usa `color`). */
-  carColor?: string;
   createdAt: string;
   /** Un jugador archivado no aparece al armar torneos nuevos, pero sigue en el historial. */
   archived?: boolean;
@@ -100,6 +98,8 @@ export interface Tournament {
   format: TournamentFormat;
   /** Solo Rocket League: partidos jugados y por jugar, en orden. */
   rlMatches: RocketLeagueMatch[];
+  /** Solo Trackmania: color del auto que el juego le asignó a cada jugador en este torneo. */
+  carColors?: Record<string, string>;
   /** Solo Trackmania: una carrera por pista jugada. */
   tmRaces: TrackmaniaRace[];
 }
