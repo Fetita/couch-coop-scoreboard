@@ -72,6 +72,7 @@ export function createTournament(
     playerIds: shuffle(input.playerIds, random),
     format: input.format ?? proposeFormat(input.game, input.playerIds.length),
     rlMatches: [],
+    tmRaces: [],
   };
   const tournament: Tournament = { ...base, rlMatches: initialMatches(base) };
   return [{ ...data, tournaments: [tournament, ...data.tournaments] }, tournament];

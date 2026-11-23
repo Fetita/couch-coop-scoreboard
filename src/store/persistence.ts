@@ -4,7 +4,7 @@ import type { AppData, Tournament } from '../model/types';
 export const STORAGE_KEY = 'couch-coop/data';
 
 export function emptyData(): AppData {
-  return { schemaVersion: 2, players: [], tournaments: [] };
+  return { schemaVersion: 3, players: [], tournaments: [], tmTracks: [] };
 }
 
 /**
@@ -17,15 +17,20 @@ export function migrate(raw: unknown): AppData {
   if (data.schemaVersion === 1) {
     // v1 -> v2: los torneos de Rocket League pasan a tener partidos.
     const tournaments = ((data.tournaments ?? []) as Tournament[]).map((t) => {
-      const withMatches: Tournament = { ...t, rlMatches: [] };
+      const withMatches: Tournament = { ...t, rlMatches: [], tmRaces: [] };
       return { ...withMatches, rlMatches: initialMatches(withMatches) };
     });
     data = { ...data, schemaVersion: 2, tournaments };
   }
-  if (data.schemaVersion !== 2) {
+  if (data.schemaVersion === 2) {
+    // v2 -> v3: carreras de Trackmania y pistas guardadas.
+    const tournaments = ((data.tournaments ?? []) as Tournament[]).map((t) => ({ ...t, tmRaces: t.tmRaces ?? [] }));
+    data = { ...data, schemaVersion: 3, tournaments, tmTracks: data.tmTracks ?? [] };
+  }
+  if (data.schemaVersion !== 3) {
     throw new Error(`Versión de datos desconocida: ${String(data.schemaVersion)}`);
   }
-  if (!Array.isArray(data.players) || !Array.isArray(data.tournaments)) {
+  if (!Array.isArray(data.players) || !Array.isArray(data.tournaments) || !Array.isArray(data.tmTracks)) {
     throw new Error('Faltan jugadores o torneos en los datos.');
   }
   return data as AppData;

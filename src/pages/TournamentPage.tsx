@@ -4,6 +4,7 @@ import { FormatEditor } from '../components/FormatEditor';
 import { PlayerChip } from '../components/PlayerChip';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { RocketLeagueSection } from '../components/RocketLeagueSection';
+import { TrackmaniaSection } from '../components/TrackmaniaSection';
 import { describeFormat } from '../model/format';
 import { GAMES } from '../model/games';
 import type { TournamentFormat } from '../model/types';
@@ -85,10 +86,7 @@ export function TournamentPage() {
       {tournament.game === 'rocket-league' ? (
         <RocketLeagueSection tournament={tournament} players={playerMap} />
       ) : (
-        <section className="card stack">
-          <h2>Carreras</h2>
-          <p className="muted">Las carreras guiadas en vivo y la tabla llegan en la próxima versión.</p>
-        </section>
+        <TrackmaniaSection tournament={tournament} players={playerMap} />
       )}
 
       <section className="card stack">
