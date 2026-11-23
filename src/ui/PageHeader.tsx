@@ -17,10 +17,12 @@ export function PageHeader({ title, subtitle, back, action, onTitleClick }: {
           <button type="button" className="back" onClick={back.onClick}><Icon name="back" size={18} />{back.label}</button>
         )
       )}
-      <div className="page-title-row">
-        <h1 onClick={onTitleClick} className={onTitleClick ? 'editable' : undefined}>{title}</h1>
-        {action}
-      </div>
+      {(title || action) && (
+        <div className="page-title-row">
+          <h1 onClick={onTitleClick} className={onTitleClick ? 'editable' : undefined}>{title}</h1>
+          {action}
+        </div>
+      )}
       {subtitle && <div className="page-subtitle">{subtitle}</div>}
     </header>
   );

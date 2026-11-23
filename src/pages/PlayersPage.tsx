@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ColorPicker } from '../components/ColorPicker';
-import { carColor } from '../model/colors';
+import { playerStats } from '../games/stats';
 import type { Player } from '../model/types';
 import { addPlayer, isPlayerUsed, removePlayer, updatePlayer } from '../store/actions';
 import { update, useData } from '../store/store';
+import { Avatar } from '../ui/Avatar';
+import { Icon } from '../ui/Icon';
+import { PageHeader } from '../ui/PageHeader';
 
 export function PlayersPage() {
   const data = useData();
@@ -27,9 +30,7 @@ export function PlayersPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Jugadores</h1>
-      </header>
+      <PageHeader title="Jugadores" subtitle={`${active.length} en el grupo`} />
       <form
         className="row"
         onSubmit={(e) => {
@@ -37,33 +38,37 @@ export function PlayersPage() {
           if (run((d) => addPlayer(d, name)[0])) setName('');
         }}
       >
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" aria-label="Nombre del jugador" />
-        <button type="submit" className="btn btn-primary" disabled={!name.trim()}>Agregar</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del jugador nuevo" aria-label="Nombre del jugador" />
+        <button type="submit" className="btn btn-primary" disabled={!name.trim()}><Icon name="plus" size={18} />Agregar</button>
       </form>
       {error && <p className="error">{error}</p>}
 
       {active.length === 0 ? (
-        <p className="muted">Todavía no hay jugadores.</p>
+        <div className="hero-empty">
+          <div className="hero-icon"><Icon name="users" size={30} /></div>
+          <strong>Todavía no hay jugadores</strong>
+          <span>Agregalos acá o directamente al crear un torneo.</span>
+        </div>
       ) : (
-        <ul className="cards">
+        <ul className="list">
           {active.map((p) => (
-            <PlayerRow key={p.id} player={p} used={isPlayerUsed(data, p.id)} run={run} />
+            <PlayerRow key={p.id} player={p} used={isPlayerUsed(data, p.id)} summary={summary(data, p.id)} run={run} />
           ))}
         </ul>
       )}
 
       {archived.length > 0 && (
-        <section>
+        <section className="stack-sm">
           <button type="button" className="link" onClick={() => setShowArchived(!showArchived)}>
             {showArchived ? 'Ocultar' : 'Ver'} archivados ({archived.length})
           </button>
           {showArchived && (
-            <ul className="cards">
+            <ul className="list">
               {archived.map((p) => (
-                <li key={p.id} className="card player-row">
-                  <span className="dot" style={{ background: p.color }} />
-                  <Link to={`/jugador/${p.id}`} className="grow muted">{p.name}</Link>
-                  <button type="button" className="link" onClick={() => run((d) => updatePlayer(d, p.id, { archived: false }))}>
+                <li key={p.id} className="player-card" style={{ opacity: 0.7 }}>
+                  <Avatar player={p} size={40} />
+                  <Link to={`/jugador/${p.id}`} className="grow"><strong>{p.name}</strong><span className="hint">Archivado</span></Link>
+                  <button type="button" className="btn btn-sm" onClick={() => run((d) => updatePlayer(d, p.id, { archived: false }))}>
                     Restaurar
                   </button>
                 </li>
@@ -76,9 +81,18 @@ export function PlayersPage() {
   );
 }
 
-function PlayerRow({ player, used, run }: {
+function summary(data: ReturnType<typeof useData>, id: string): string {
+  const s = playerStats(data, id);
+  if (s.tournaments === 0) return 'Sin torneos todavía';
+  const parts = [`${s.tournaments} ${s.tournaments === 1 ? 'torneo' : 'torneos'}`];
+  if (s.tournamentWins) parts.push(`${s.tournamentWins} 🏆`);
+  return parts.join(' · ');
+}
+
+function PlayerRow({ player, used, summary, run }: {
   player: Player;
   used: boolean;
+  summary: string;
   run: (fn: Parameters<typeof update>[0]) => boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -86,31 +100,36 @@ function PlayerRow({ player, used, run }: {
 
   if (!editing) {
     return (
-      <li className="card player-row">
-        <Link to={`/jugador/${player.id}`} className="name-cell grow">
-          <span className="dot dot-lg" style={{ background: player.color }} />
-          {player.name}
+      <li className="player-card">
+        <Link to={`/jugador/${player.id}`} className="row grow">
+          <Avatar player={player} size={44} />
+          <span className="grow">
+            <strong>{player.name}</strong>
+            <span className="hint">{summary}</span>
+          </span>
         </Link>
-        <button type="button" className="link" onClick={() => { setName(player.name); setEditing(true); }}>Editar</button>
+        <button type="button" className="icon-btn" aria-label={`Editar a ${player.name}`} onClick={() => { setName(player.name); setEditing(true); }}>
+          <Icon name="edit" size={18} />
+        </button>
       </li>
     );
   }
 
   return (
-    <li className="card stack">
-      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Nombre" />
+    <li className="card">
+      <div className="row">
+        <Avatar player={{ ...player, name: name || player.name }} size={44} />
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Nombre" />
+      </div>
       <div className="field">
         <span className="field-label">Color</span>
         <ColorPicker label="Color" value={player.color} onChange={(c) => run((d) => updatePlayer(d, player.id, { color: c }))} />
       </div>
-      <div className="field">
-        <span className="field-label">Color del auto en Trackmania</span>
-        <ColorPicker label="Color del auto" value={carColor(player)} onChange={(c) => run((d) => updatePlayer(d, player.id, { carColor: c }))} />
-      </div>
       <div className="row">
         <button
           type="button"
-          className="btn btn-danger"
+          className="icon-btn"
+          aria-label={used ? 'Archivar' : 'Borrar'}
           onClick={() => {
             const msg = used
               ? `${player.name} ya jugó torneos: se archiva y queda en el historial. ¿Seguir?`
@@ -118,13 +137,12 @@ function PlayerRow({ player, used, run }: {
             if (window.confirm(msg)) run((d) => removePlayer(d, player.id));
           }}
         >
-          {used ? 'Archivar' : 'Borrar'}
+          <Icon name="trash" size={18} />
         </button>
-        <span className="grow" />
-        <button type="button" className="btn" onClick={() => setEditing(false)}>Cancelar</button>
+        <button type="button" className="btn grow" onClick={() => setEditing(false)}>Cancelar</button>
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary grow"
           onClick={() => { if (run((d) => updatePlayer(d, player.id, { name }))) setEditing(false); }}
         >
           Guardar
