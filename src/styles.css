@@ -162,7 +162,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .standings th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
 .standings tr:last-child td { border-bottom: 0; }
 .standings .left { text-align: left; }
-.standings .name-cell { display: inline-flex; align-items: center; gap: 6px; }
+.name-cell { display: inline-flex; align-items: center; gap: 6px; }
 .standings .strong { font-weight: 800; color: var(--accent); }
 
 .awards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -193,3 +193,40 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .winner-btn { flex-direction: column; gap: 4px; padding: 12px 8px; min-height: 72px; font-size: 0.9rem; }
 .winner-btn.on { background: var(--ok); border-color: var(--ok); color: var(--accent-text); }
 .side-row { display: flex; flex-direction: column; gap: 6px; }
+
+/* Trackmania */
+.big-runner { font-size: 1.5rem; text-align: center; }
+.big-runner strong { color: var(--accent); }
+.time-input { display: flex; align-items: center; gap: 10px; }
+.time-input input { flex: 1; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.time-preview { min-width: 6.5em; text-align: right; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 600; }
+.toggle input { width: 24px; height: 24px; accent-color: var(--accent); }
+.winner-card { border-color: var(--ok); }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.board-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px;
+  background: var(--surface-2); font-variant-numeric: tabular-nums;
+}
+.board-row.running { outline: 2px solid var(--accent); }
+.board-row.out { opacity: 0.55; }
+.board-pos { width: 1.4em; text-align: center; font-weight: 800; }
+.board-time { font-weight: 700; }
+.board-att { min-width: 2em; text-align: right; }
+.board-pts { font-weight: 800; color: var(--accent); }
+.board-row .icon { width: 30px; height: 30px; }
+.log { display: flex; flex-direction: column; gap: 4px; }
+.log-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.log-row.editing { flex-direction: column; align-items: stretch; }
+.race-row { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.race-row.is-next { outline: 2px solid var(--accent); }
+
+/* Historial y estadísticas */
+.record-row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+.record-list { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.record-top { font-weight: 700; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.stat-value { font-size: 1.3rem; font-weight: 800; }
+.player-row .name-cell { display: flex; align-items: center; gap: 10px; }
+h3 { margin: 4px 0 0; font-size: 0.95rem; }

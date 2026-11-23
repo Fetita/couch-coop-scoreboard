@@ -54,6 +54,36 @@ export interface RocketLeagueMatch {
   playedAt?: string;
 }
 
+/** Pista de Trackmania, reutilizable entre torneos. Depende del modo de auto. */
+export interface TrackmaniaTrack {
+  id: string;
+  name: string;
+  carMode: string;
+}
+
+/** Un evento de la carrera: un intento, o una eliminación marcada a mano. */
+export type TrackmaniaEvent =
+  | {
+      id: string;
+      type: 'run';
+      playerId: string;
+      /** Tiempo en milisegundos; null si no terminó la pista. */
+      timeMs: number | null;
+      /** Se quedó sin nafta en este intento (solo cuenta después de la primera vuelta). */
+      outOfFuel: boolean;
+    }
+  | { id: string; type: 'eliminate'; playerId: string };
+
+export interface TrackmaniaRace {
+  id: string;
+  carMode: string;
+  trackId: string;
+  /** Orden de salida de la primera vuelta. */
+  order: string[];
+  events: TrackmaniaEvent[];
+  createdAt: string;
+}
+
 export type TournamentStatus = 'active' | 'finished';
 
 export interface Tournament {
@@ -68,10 +98,13 @@ export interface Tournament {
   format: TournamentFormat;
   /** Solo Rocket League: partidos jugados y por jugar, en orden. */
   rlMatches: RocketLeagueMatch[];
+  /** Solo Trackmania: una carrera por pista jugada. */
+  tmRaces: TrackmaniaRace[];
 }
 
 export interface AppData {
-  schemaVersion: 2;
+  schemaVersion: 3;
   players: Player[];
+  tmTracks: TrackmaniaTrack[];
   tournaments: Tournament[];
 }

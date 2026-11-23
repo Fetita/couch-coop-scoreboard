@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PLAYER_COLORS } from '../model/colors';
 import type { Player } from '../model/types';
 import { addPlayer, isPlayerUsed, removePlayer, updatePlayer } from '../store/actions';
@@ -60,7 +61,7 @@ export function PlayersPage() {
               {archived.map((p) => (
                 <li key={p.id} className="card player-row">
                   <span className="dot" style={{ background: p.color }} />
-                  <span className="grow muted">{p.name}</span>
+                  <Link to={`/jugador/${p.id}`} className="grow muted">{p.name}</Link>
                   <button type="button" className="link" onClick={() => run((d) => updatePlayer(d, p.id, { archived: false }))}>
                     Restaurar
                   </button>
@@ -84,10 +85,12 @@ function PlayerRow({ player, used, run }: {
 
   if (!editing) {
     return (
-      <li className="card player-row" onClick={() => { setName(player.name); setEditing(true); }}>
-        <span className="dot dot-lg" style={{ background: player.color }} />
-        <span className="grow">{player.name}</span>
-        <span className="muted">Editar</span>
+      <li className="card player-row">
+        <Link to={`/jugador/${player.id}`} className="name-cell grow">
+          <span className="dot dot-lg" style={{ background: player.color }} />
+          {player.name}
+        </Link>
+        <button type="button" className="link" onClick={() => { setName(player.name); setEditing(true); }}>Editar</button>
       </li>
     );
   }
