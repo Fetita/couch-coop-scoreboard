@@ -34,6 +34,26 @@ export interface TrackmaniaFormat {
 
 export type TournamentFormat = RocketLeagueFormat | TrackmaniaFormat;
 
+/** Goles y saves de un jugador en un partido. */
+export interface RocketLeagueStat {
+  goals: number;
+  saves: number;
+}
+
+export interface RocketLeagueMatch {
+  id: string;
+  /** Ronda a la que pertenece (empieza en 1). */
+  round: number;
+  team1: string[];
+  team2: string[];
+  resting: string[];
+  /** Sin empates: siempre gana un equipo (overtime con gol de oro). Vacío = sin jugar. */
+  winner?: 1 | 2;
+  /** Opcional: estadísticas por jugador. */
+  stats: Record<string, RocketLeagueStat>;
+  playedAt?: string;
+}
+
 export type TournamentStatus = 'active' | 'finished';
 
 export interface Tournament {
@@ -46,10 +66,12 @@ export interface Tournament {
   /** Jugadores en el orden sorteado al empezar. */
   playerIds: string[];
   format: TournamentFormat;
+  /** Solo Rocket League: partidos jugados y por jugar, en orden. */
+  rlMatches: RocketLeagueMatch[];
 }
 
 export interface AppData {
-  schemaVersion: 1;
+  schemaVersion: 2;
   players: Player[];
   tournaments: Tournament[];
 }

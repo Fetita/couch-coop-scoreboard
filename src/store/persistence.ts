@@ -1,9 +1,10 @@
-import type { AppData } from '../model/types';
+import { initialMatches } from '../games/rlMatches';
+import type { AppData, Tournament } from '../model/types';
 
 export const STORAGE_KEY = 'couch-coop/data';
 
 export function emptyData(): AppData {
-  return { schemaVersion: 1, players: [], tournaments: [] };
+  return { schemaVersion: 2, players: [], tournaments: [] };
 }
 
 /**
@@ -12,8 +13,16 @@ export function emptyData(): AppData {
  */
 export function migrate(raw: unknown): AppData {
   if (!raw || typeof raw !== 'object') throw new Error('Los datos no tienen el formato esperado.');
-  const data = raw as Partial<AppData>;
-  if (data.schemaVersion !== 1) {
+  let data = raw as Omit<Partial<AppData>, 'schemaVersion'> & { schemaVersion?: number };
+  if (data.schemaVersion === 1) {
+    // v1 -> v2: los torneos de Rocket League pasan a tener partidos.
+    const tournaments = ((data.tournaments ?? []) as Tournament[]).map((t) => {
+      const withMatches: Tournament = { ...t, rlMatches: [] };
+      return { ...withMatches, rlMatches: initialMatches(withMatches) };
+    });
+    data = { ...data, schemaVersion: 2, tournaments };
+  }
+  if (data.schemaVersion !== 2) {
     throw new Error(`Versión de datos desconocida: ${String(data.schemaVersion)}`);
   }
   if (!Array.isArray(data.players) || !Array.isArray(data.tournaments)) {
