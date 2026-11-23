@@ -21,3 +21,8 @@ export function pickColor(used: string[]): string {
   for (const c of PLAYER_COLORS) if (counts.get(c)! < counts.get(best)!) best = c;
   return best;
 }
+
+/** Color del auto de un jugador en Trackmania. */
+export function carColor(player: { color: string; carColor?: string } | undefined): string {
+  return player?.carColor ?? player?.color ?? '#666';
+}

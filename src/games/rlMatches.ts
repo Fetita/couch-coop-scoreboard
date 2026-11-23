@@ -2,7 +2,7 @@
 import { newId, hashString } from '../model/random';
 import type { RocketLeagueFormat, RocketLeagueMatch, RocketLeagueStat, Tournament } from '../model/types';
 import { generateMatches } from './rlSchedule';
-import { isPlayed } from './rlStandings';
+import { isPlayed, resultError } from './rlStandings';
 
 function rlFormat(t: Tournament): RocketLeagueFormat | null {
   return t.format.game === 'rocket-league' ? t.format : null;
@@ -104,7 +104,10 @@ export function recordResult(
         clean[p] = { goals: Math.max(0, Math.floor(s.goals)), saves: Math.max(0, Math.floor(s.saves)) };
       }
     }
-    return { ...m, winner, stats: clean, playedAt: m.playedAt ?? new Date().toISOString() };
+    const next = { ...m, winner, stats: clean, playedAt: m.playedAt ?? new Date().toISOString() };
+    const error = resultError(next);
+    if (error) throw new Error(error);
+    return next;
   });
 }
 

@@ -3,7 +3,8 @@
 // 1. Primera vuelta: cada jugador corre una vez, en el orden de salida.
 // 2. Después corre siempre el que tiene el peor mejor-tiempo entre los que siguen.
 // 3. Si en un intento se queda sin nafta y sigue siendo el peor, queda eliminado.
-//    Si superó el tiempo de alguien, sigue en carrera y le toca al nuevo peor.
+//    Si superó el tiempo de alguien, sigue en carrera y le toca al nuevo peor,
+//    pero ya sin nafta: en su próximo intento, si no supera a nadie, queda afuera.
 // 4. Gana el último que queda. Las posiciones van al revés de la eliminación.
 //
 // El estado se calcula siempre a partir de los eventos guardados, así corregir
@@ -28,6 +29,8 @@ export interface RaceState {
   positions: Map<string, number>;
   /** Cantidad de intentos de cada jugador. */
   attempts: Map<string, number>;
+  /** Jugadores en carrera que ya se quedaron sin nafta. */
+  noFuel: Set<string>;
 }
 
 /** Ordena del mejor al peor; sin tiempo va al final; empate: el que lo marcó antes va primero. */
@@ -47,6 +50,7 @@ export function raceState(race: Pick<TrackmaniaRace, 'order' | 'events'>): RaceS
   const eliminated: string[] = [];
   const inRace = () => race.order.filter((p) => !eliminated.includes(p));
   const ranFirstLap = new Set<string>();
+  const noFuel = new Set<string>();
 
   race.events.forEach((e: TrackmaniaEvent, i) => {
     if (!best.has(e.playerId) || eliminated.includes(e.playerId)) return;
@@ -62,7 +66,9 @@ export function raceState(race: Pick<TrackmaniaRace, 'order' | 'events'>): RaceS
     }
     const isFirstLapRun = !ranFirstLap.has(e.playerId);
     ranFirstLap.add(e.playerId);
-    if (e.outOfFuel && !isFirstLapRun) {
+    // La nafta no vuelve: una vez sin nafta, todos sus intentos siguientes son sin nafta.
+    if (!isFirstLapRun && (e.outOfFuel || noFuel.has(e.playerId))) {
+      noFuel.add(e.playerId);
       const ranked = rank(inRace(), best, setAt);
       if (ranked.length > 1 && ranked[ranked.length - 1] === e.playerId) eliminated.push(e.playerId);
     }
@@ -91,6 +97,7 @@ export function raceState(race: Pick<TrackmaniaRace, 'order' | 'events'>): RaceS
     winner: finished ? standing[0] ?? null : null,
     positions,
     attempts,
+    noFuel: new Set([...noFuel].filter((p) => !eliminated.includes(p))),
   };
 }
 

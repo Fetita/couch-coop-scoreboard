@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { raceState } from '../games/tmRace';
 import { carModes, createRace, trackmaniaStandings, tracksForMode } from '../games/tmTournament';
+import { carColor } from '../model/colors';
 import type { Player, Tournament, TrackmaniaFormat } from '../model/types';
+import { updatePlayer } from '../store/actions';
 import { update, useData } from '../store/store';
+import { ColorPicker } from './ColorPicker';
 
 export function TrackmaniaSection({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
   const data = useData();
@@ -67,7 +70,7 @@ export function TrackmaniaSection({ tournament, players }: { tournament: Tournam
                 <tr key={r.playerId}>
                   <td>{r.position}</td>
                   <td className="left">
-                    <span className="name-cell"><span className="dot" style={{ background: p?.color }} /> {p?.name ?? '?'}</span>
+                    <span className="name-cell"><span className="dot" style={{ background: carColor(p) }} /> {p?.name ?? '?'}</span>
                   </td>
                   <td className="strong">{r.points}</td>
                   <td>{r.races}</td>
@@ -80,6 +83,8 @@ export function TrackmaniaSection({ tournament, players }: { tournament: Tournam
         </table>
         <p className="hint">Puntos por puesto: {format.pointsScale.join('-')}</p>
       </section>
+
+      <CarColors tournament={tournament} players={players} />
 
       {tournament.tmRaces.length > 0 && (
         <section className="card stack">
@@ -171,6 +176,38 @@ function NewRace({ tournament, number, planned }: { tournament: Tournament; numb
       <button type="button" className="btn btn-primary btn-block" disabled={!effectiveMode || !track.trim()} onClick={start}>
         Empezar carrera
       </button>
+    </section>
+  );
+}
+
+/** Cada jugador elige el color de su auto, como en el juego. */
+function CarColors({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
+  const [editing, setEditing] = useState<string | null>(null);
+  return (
+    <section className="card stack">
+      <div className="section-head">
+        <h2>Autos</h2>
+        <span className="hint">Tocá un jugador para cambiar su color</span>
+      </div>
+      <div className="stack-sm">
+        {tournament.playerIds.map((id) => {
+          const p = players.get(id);
+          if (!p) return null;
+          return (
+            <div key={id} className="stack-sm">
+              <button type="button" className={`car-row${editing === id ? ' on' : ''}`} onClick={() => setEditing(editing === id ? null : id)}>
+                <span className="car-swatch" style={{ background: carColor(p) }} />
+                <span className="grow">{p.name}</span>
+                <span className="hint">{editing === id ? 'Listo' : 'Cambiar'}</span>
+              </button>
+              {editing === id && (
+                <ColorPicker label={`Color del auto de ${p.name}`} value={carColor(p)}
+                  onChange={(c) => update((d) => updatePlayer(d, id, { carColor: c }))} />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { MatchPage } from './pages/MatchPage';
 import { NewTournamentPage } from './pages/NewTournamentPage';
+import { GeneralPage } from './pages/GeneralPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { PlayerStatsPage } from './pages/PlayerStatsPage';
 import { PlayersPage } from './pages/PlayersPage';
@@ -20,6 +21,7 @@ export function App() {
           <Route path="/torneo/:id" element={<TournamentPage />} />
           <Route path="/torneo/:id/partido/:matchId" element={<MatchPage />} />
           <Route path="/torneo/:id/carrera/:raceId" element={<RacePage />} />
+          <Route path="/general" element={<GeneralPage />} />
           <Route path="/historial" element={<HistoryPage />} />
           <Route path="/jugador/:id" element={<PlayerStatsPage />} />
           <Route path="/jugadores" element={<PlayersPage />} />
@@ -28,6 +30,7 @@ export function App() {
       </main>
       <nav className="tabbar">
         <NavLink to="/" end>🏆<span>Torneos</span></NavLink>
+        <NavLink to="/general">📊<span>General</span></NavLink>
         <NavLink to="/historial">📜<span>Historial</span></NavLink>
         <NavLink to="/jugadores">👥<span>Jugadores</span></NavLink>
         <NavLink to="/ajustes">⚙️<span>Ajustes</span></NavLink>

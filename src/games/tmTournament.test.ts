@@ -112,3 +112,23 @@ describe('torneo de Trackmania', () => {
     expect(m.tournaments[0].tmRaces).toEqual([]);
   });
 });
+
+describe('tabla general', () => {
+  it('suma puntos de todos los torneos y campeonatos', async () => {
+    const { generalStandings } = await import('./stats');
+    let [d, tid] = setup();
+    const [a, b, c] = d.players.map((p) => p.id);
+    d = playRace(d, tid, 'Stadium', 'A01', [a, b, c]);
+    d = finishTournament(d, tid);
+    let rl;
+    [d, rl] = createTournament(d, { game: 'rocket-league', playerIds: [a, b, c] });
+    const m = rl.rlMatches[0];
+    d = { ...d, tournaments: d.tournaments.map((t) => t.id === rl.id ? { ...t, rlMatches: t.rlMatches.map((x) => x.id === m.id ? { ...x, winner: 2 as const } : x) } : t) };
+    const rows = generalStandings(d);
+    const byId = Object.fromEntries(rows.map((r) => [r.playerId, r]));
+    expect(byId[a]).toMatchObject({ tmPoints: 3, titles: 1, tournaments: 2 });
+    expect(byId[m.team2[0]].rlPoints).toBe(1);
+    expect(rows[0].playerId).toBe(rows.reduce((best, r) => (r.points > best.points ? r : best)).playerId);
+    expect(generalStandings(d, 'rocket-league').every((r) => r.tmPoints === 0)).toBe(true);
+  });
+});

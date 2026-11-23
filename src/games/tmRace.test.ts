@@ -41,6 +41,21 @@ describe('carrera por eliminación', () => {
     expect(s.next).toBe('A');
   });
 
+  it('el que se quedó sin nafta sigue sin nafta en los próximos intentos', () => {
+    const events = [run('A', 50000), run('B', 49000), run('C', 51000), run('C', 49900, true)];
+    let s = raceState({ order, events });
+    expect([...s.noFuel]).toEqual(['C']);
+    // A corre y supera a C: ahora C es el peor y vuelve a correr.
+    events.push(run('A', 49800));
+    s = raceState({ order, events });
+    expect(s.next).toBe('C');
+    // C corre sin marcar la nafta, no supera a nadie: igual queda eliminado.
+    events.push(run('C', 49850, false));
+    s = raceState({ order, events });
+    expect(s.eliminated).toEqual(['C']);
+    expect(s.noFuel.size).toBe(0);
+  });
+
   it('quedarse sin nafta en la primera vuelta no elimina', () => {
     const s = raceState({ order, events: [run('A', null, true)] });
     expect(s.eliminated).toEqual([]);

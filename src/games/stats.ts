@@ -70,3 +70,49 @@ export function playerStats(data: AppData, playerId: string): PlayerStats {
   }
   return s;
 }
+
+export interface GeneralRow {
+  playerId: string;
+  position: number;
+  /** Puntos acumulados: partidos ganados en Rocket League + puntos por puesto en Trackmania. */
+  points: number;
+  rlPoints: number;
+  tmPoints: number;
+  titles: number;
+  tournaments: number;
+}
+
+/** Tabla general: suma lo de todos los torneos (en curso y terminados). */
+export function generalStandings(data: AppData, game?: Tournament['game']): GeneralRow[] {
+  const rows = new Map<string, GeneralRow>();
+  const row = (id: string) => {
+    if (!rows.has(id)) rows.set(id, { playerId: id, position: 0, points: 0, rlPoints: 0, tmPoints: 0, titles: 0, tournaments: 0 });
+    return rows.get(id)!;
+  };
+  for (const t of data.tournaments) {
+    if (game && t.game !== game) continue;
+    const counted = new Set<string>();
+    if (t.format.game === 'rocket-league') {
+      for (const r of rocketLeagueStandings(t.playerIds, t.rlMatches, t.format.tiebreakers)) {
+        if (r.played === 0 && !t.playerIds.includes(r.playerId)) continue;
+        row(r.playerId).rlPoints += r.points;
+        counted.add(r.playerId);
+      }
+    } else {
+      for (const r of trackmaniaStandings(t)) {
+        row(r.playerId).tmPoints += r.points;
+        counted.add(r.playerId);
+      }
+    }
+    for (const p of counted) row(p).tournaments++;
+    if (t.status === 'finished') for (const p of tournamentLeaders(t)) row(p).titles++;
+  }
+  const list = [...rows.values()];
+  for (const r of list) r.points = r.rlPoints + r.tmPoints;
+  const cmp = (a: GeneralRow, b: GeneralRow) => b.points - a.points || b.titles - a.titles;
+  list.sort(cmp);
+  list.forEach((r, i) => {
+    r.position = i > 0 && cmp(list[i - 1], r) === 0 ? list[i - 1].position : i + 1;
+  });
+  return list;
+}
