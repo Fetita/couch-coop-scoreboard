@@ -55,8 +55,6 @@ export interface NewTournament {
   name?: string;
   playerIds: string[];
   format?: TournamentFormat;
-  /** Trackmania: color de auto de cada jugador. */
-  carColors?: Record<string, string>;
 }
 
 export function createTournament(
@@ -71,11 +69,11 @@ export function createTournament(
     game: input.game,
     createdAt: new Date().toISOString(),
     status: 'active',
-    playerIds: shuffle(input.playerIds, random),
+    // Rocket League sortea el orden; en Trackmania el orden es cómo están sentados.
+    playerIds: input.game === 'rocket-league' ? shuffle(input.playerIds, random) : [...input.playerIds],
     format: input.format ?? proposeFormat(input.game, input.playerIds.length),
     rlMatches: [],
     tmRaces: [],
-    ...(input.game === 'trackmania' && input.carColors ? { carColors: input.carColors } : {}),
   };
   const tournament: Tournament = { ...base, rlMatches: initialMatches(base) };
   return [{ ...data, tournaments: [tournament, ...data.tournaments] }, tournament];
@@ -131,9 +129,4 @@ export function reopenTournament(data: AppData, id: string): AppData {
 
 export function deleteTournament(data: AppData, id: string): AppData {
   return { ...data, tournaments: data.tournaments.filter((t) => t.id !== id) };
-}
-
-/** Trackmania: el color de auto que le tocó a un jugador en este torneo. */
-export function setCarColor(data: AppData, tournamentId: string, playerId: string, color: string): AppData {
-  return mapTournament(data, tournamentId, (t) => ({ ...t, carColors: { ...t.carColors, [playerId]: color } }));
 }

@@ -1,10 +1,11 @@
 import { initialMatches } from '../games/rlMatches';
 import type { AppData, Tournament } from '../model/types';
+import { legacyRaceState, type LegacyTrackmaniaEvent } from './legacyTmRace';
 
 export const STORAGE_KEY = 'couch-coop/data';
 
 export function emptyData(): AppData {
-  return { schemaVersion: 3, players: [], tournaments: [], tmTracks: [] };
+  return { schemaVersion: 4, players: [], tournaments: [], tmTracks: [] };
 }
 
 /**
@@ -27,7 +28,21 @@ export function migrate(raw: unknown): AppData {
     const tournaments = ((data.tournaments ?? []) as Tournament[]).map((t) => ({ ...t, tmRaces: t.tmRaces ?? [] }));
     data = { ...data, schemaVersion: 3, tournaments, tmTracks: data.tmTracks ?? [] };
   }
-  if (data.schemaVersion !== 3) {
+  if (data.schemaVersion === 3) {
+    // v3 -> v4: Trackmania deja de guardar tiempos y colores elegidos a mano.
+    // Cada carrera guarda solo el orden de salida y el orden de eliminación.
+    type V3Race = Omit<Tournament['tmRaces'][number], 'eliminated'> & { events?: LegacyTrackmaniaEvent[]; eliminated?: string[] };
+    type V3Tournament = Omit<Tournament, 'tmRaces'> & { tmRaces?: V3Race[]; carColors?: unknown };
+    const tournaments = ((data.tournaments ?? []) as V3Tournament[]).map(({ carColors: _drop, ...t }) => ({
+      ...t,
+      tmRaces: (t.tmRaces ?? []).map(({ events, ...r }) => ({
+        ...r,
+        eliminated: r.eliminated ?? legacyRaceState({ order: r.order, events: events ?? [] }).eliminated,
+      })),
+    }));
+    data = { ...data, schemaVersion: 4, tournaments: tournaments as Tournament[] };
+  }
+  if (data.schemaVersion !== 4) {
     throw new Error(`Versión de datos desconocida: ${String(data.schemaVersion)}`);
   }
   if (!Array.isArray(data.players) || !Array.isArray(data.tournaments) || !Array.isArray(data.tmTracks)) {

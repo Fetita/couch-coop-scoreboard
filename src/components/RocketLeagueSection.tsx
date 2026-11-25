@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { addMatch, nextMatch, rebuildPending } from '../games/rlMatches';
-import { award, isPlayed, rocketLeagueStandings, teamGoals, type Award } from '../games/rlStandings';
+import { award, isPlayed, rocketLeagueStandings, statRanking, teamGoals, type Award, type StatRankingRow } from '../games/rlStandings';
 import type { Player, RocketLeagueFormat, Tournament } from '../model/types';
 import { mapTournament } from '../store/actions';
 import { update } from '../store/store';
@@ -151,7 +152,45 @@ export function RlTable({ tournament, players }: { tournament: Tournament; playe
           <AwardBox title="Mejor arquero" icon="glove" award={keeper} unit="saves" players={players} />
         </div>
       </section>
+      <StatRankings rows={rows} players={players} />
     </>
+  );
+}
+
+/** Rankings de goles y de saves del torneo. */
+function StatRankings({ rows, players }: { rows: ReturnType<typeof rocketLeagueStandings>; players: Map<string, Player> }) {
+  const [field, setField] = useState<'goals' | 'saves'>('goals');
+  const ranking = statRanking(rows, field);
+  const any = ranking.some((r) => r.value > 0);
+  const unit = field === 'goals' ? 'Goles' : 'Saves';
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Ranking de {field === 'goals' ? 'goles' : 'saves'}</h2>
+      </div>
+      <div className="filter-row">
+        <button type="button" className={`chip text-only ${field === 'goals' ? 'chip-on' : ''}`} onClick={() => setField('goals')}>
+          <Icon name="ball" size={16} />Goles
+        </button>
+        <button type="button" className={`chip text-only ${field === 'saves' ? 'chip-on' : ''}`} onClick={() => setField('saves')}>
+          <Icon name="glove" size={16} />Saves
+        </button>
+      </div>
+      {any ? (
+        <RankTable<StatRankingRow>
+          rows={ranking}
+          players={players}
+          link
+          columns={[
+            { label: unit.charAt(0), title: unit, value: (r) => r.value, strong: true },
+            { label: 'PJ', title: 'Partidos jugados', value: (r) => r.played },
+            { label: 'Prom', title: `${unit} por partido`, value: (r) => r.perMatch.toFixed(1) },
+          ]}
+        />
+      ) : (
+        <p className="muted">Todavía no se cargaron {field === 'goals' ? 'goles' : 'saves'}.</p>
+      )}
+    </section>
   );
 }
 

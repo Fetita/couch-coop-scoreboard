@@ -1,104 +1,61 @@
-// Carrera de Trackmania: time trial por eliminación.
+// Carrera de Trackmania: lo que cuenta es el orden en que van quedando eliminados.
 //
-// 1. Primera vuelta: cada jugador corre una vez, en el orden de salida.
-// 2. Después corre siempre el que tiene el peor mejor-tiempo entre los que siguen.
-// 3. Si en un intento se queda sin nafta y sigue siendo el peor, queda eliminado.
-//    Si superó el tiempo de alguien, sigue en carrera y le toca al nuevo peor,
-//    pero ya sin nafta: en su próximo intento, si no supera a nadie, queda afuera.
-// 4. Gana el último que queda. Las posiciones van al revés de la eliminación.
-//
-// El estado se calcula siempre a partir de los eventos guardados, así corregir
-// un intento recalcula todo.
+// - El orden de salida define el color del auto: el 1° es azul, el 2° rojo,
+//   el 3° verde, el 4° violeta y el 5° rosa (siempre igual en cada carrera).
+// - En la primera carrera el orden sale de cómo están sentados.
+// - Desde la segunda, el orden es el resultado de la carrera anterior:
+//   el que ganó sale primero (azul), el segundo rojo, y así.
+// - Durante la carrera se toca a cada jugador cuando queda eliminado.
+//   Cuando queda uno solo, ganó. Las posiciones van al revés de la eliminación.
 
-import type { TrackmaniaEvent, TrackmaniaRace } from '../model/types';
+import type { TrackmaniaRace } from '../model/types';
+
+export interface CarSlot {
+  name: string;
+  hex: string;
+}
+
+/** Colores de los autos por orden de salida. */
+export const CAR_SLOTS: CarSlot[] = [
+  { name: 'Azul', hex: '#3b82f6' },
+  { name: 'Rojo', hex: '#ef4444' },
+  { name: 'Verde', hex: '#22c55e' },
+  { name: 'Violeta', hex: '#8b5cf6' },
+  { name: 'Rosa', hex: '#ec4899' },
+];
+
+/** Color del auto según el lugar en el orden de salida (empieza en 0). Con más de 5 vuelve a empezar. */
+export function carSlot(index: number): CarSlot {
+  return CAR_SLOTS[((index % CAR_SLOTS.length) + CAR_SLOTS.length) % CAR_SLOTS.length];
+}
 
 export interface RaceState {
-  /** Mejor tiempo de cada jugador (null = todavía sin tiempo). */
-  best: Map<string, number | null>;
-  /** Jugadores en carrera, del mejor al peor tiempo. */
-  standing: string[];
+  /** Siguen en carrera, en el orden de salida. */
+  remaining: string[];
   /** Eliminados en orden (el primero es el último puesto). */
   eliminated: string[];
-  /** ¿Sigue la primera vuelta? */
-  firstLap: boolean;
-  /** A quién le toca correr ahora, o null si terminó. */
-  next: string | null;
   finished: boolean;
   winner: string | null;
-  /** Posición final o provisoria de cada jugador (1 = primero). */
+  /** Posición de cada jugador ya definida (1 = primero). */
   positions: Map<string, number>;
-  /** Cantidad de intentos de cada jugador. */
-  attempts: Map<string, number>;
-  /** Jugadores en carrera que ya se quedaron sin nafta. */
-  noFuel: Set<string>;
 }
 
-/** Ordena del mejor al peor; sin tiempo va al final; empate: el que lo marcó antes va primero. */
-function rank(players: string[], best: Map<string, number | null>, setAt: Map<string, number>): string[] {
-  return [...players].sort((a, b) => {
-    const ta = best.get(a) ?? Infinity;
-    const tb = best.get(b) ?? Infinity;
-    if (ta !== tb) return ta - tb;
-    return (setAt.get(a) ?? Infinity) - (setAt.get(b) ?? Infinity);
-  });
-}
-
-export function raceState(race: Pick<TrackmaniaRace, 'order' | 'events'>): RaceState {
-  const best = new Map<string, number | null>(race.order.map((p) => [p, null]));
-  const setAt = new Map<string, number>();
-  const attempts = new Map<string, number>(race.order.map((p) => [p, 0]));
-  const eliminated: string[] = [];
-  const inRace = () => race.order.filter((p) => !eliminated.includes(p));
-  const ranFirstLap = new Set<string>();
-  const noFuel = new Set<string>();
-
-  race.events.forEach((e: TrackmaniaEvent, i) => {
-    if (!best.has(e.playerId) || eliminated.includes(e.playerId)) return;
-    if (e.type === 'eliminate') {
-      eliminated.push(e.playerId);
-      return;
-    }
-    attempts.set(e.playerId, attempts.get(e.playerId)! + 1);
-    const prev = best.get(e.playerId) ?? null;
-    if (e.timeMs !== null && (prev === null || e.timeMs < prev)) {
-      best.set(e.playerId, e.timeMs);
-      setAt.set(e.playerId, i);
-    }
-    const isFirstLapRun = !ranFirstLap.has(e.playerId);
-    ranFirstLap.add(e.playerId);
-    // La nafta no vuelve: una vez sin nafta, todos sus intentos siguientes son sin nafta.
-    if (!isFirstLapRun && (e.outOfFuel || noFuel.has(e.playerId))) {
-      noFuel.add(e.playerId);
-      const ranked = rank(inRace(), best, setAt);
-      if (ranked.length > 1 && ranked[ranked.length - 1] === e.playerId) eliminated.push(e.playerId);
-    }
-  });
-
-  const remaining = inRace();
-  const standing = rank(remaining, best, setAt);
-  const firstLap = remaining.some((p) => !ranFirstLap.has(p));
-  const finished = !firstLap && remaining.length <= 1;
-  let next: string | null = null;
-  if (!finished) {
-    next = firstLap ? race.order.find((p) => remaining.includes(p) && !ranFirstLap.has(p))! : standing[standing.length - 1];
-  }
-
+export function raceState(race: Pick<TrackmaniaRace, 'order' | 'eliminated'>): RaceState {
+  const eliminated = race.eliminated.filter((p, i) => race.order.includes(p) && race.eliminated.indexOf(p) === i);
+  const remaining = race.order.filter((p) => !eliminated.includes(p));
+  const finished = race.order.length >= 2 && remaining.length <= 1;
   const positions = new Map<string, number>();
-  standing.forEach((p, i) => positions.set(p, i + 1));
   eliminated.forEach((p, i) => positions.set(p, race.order.length - i));
+  const winner = finished ? remaining[0] ?? null : null;
+  if (winner) positions.set(winner, 1);
+  return { remaining, eliminated, finished, winner, positions };
+}
 
-  return {
-    best,
-    standing,
-    eliminated,
-    firstLap,
-    next,
-    finished,
-    winner: finished ? standing[0] ?? null : null,
-    positions,
-    attempts,
-    noFuel: new Set([...noFuel].filter((p) => !eliminated.includes(p))),
-  };
+/** Resultado final, del primero al último. Vacío si la carrera no terminó. */
+export function raceResult(race: Pick<TrackmaniaRace, 'order' | 'eliminated'>): string[] {
+  const s = raceState(race);
+  if (!s.finished) return [];
+  return [...s.positions.entries()].sort((a, b) => a[1] - b[1]).map(([p]) => p);
 }
 
 /** Puntos de la carrera según la escala (solo si terminó). */
@@ -108,44 +65,4 @@ export function racePoints(race: TrackmaniaRace, scale: number[]): Map<string, n
   if (!state.finished) return points;
   for (const [p, pos] of state.positions) points.set(p, scale[pos - 1] ?? 0);
   return points;
-}
-
-/** 83456 -> "1:23.456" */
-export function formatTime(ms: number | null | undefined): string {
-  if (ms === null || ms === undefined) return '—';
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const millis = ms % 1000;
-  const ss = String(seconds).padStart(minutes > 0 ? 2 : 1, '0');
-  return `${minutes > 0 ? `${minutes}:` : ''}${ss}.${String(millis).padStart(3, '0')}`;
-}
-
-/** Diferencia con un tiempo de referencia: "+0.123". */
-export function formatGap(ms: number | null | undefined, ref: number | null | undefined): string {
-  if (ms === null || ms === undefined || ref === null || ref === undefined) return '';
-  const d = ms - ref;
-  if (d === 0) return '';
-  return `+${formatTime(d)}`;
-}
-
-/**
- * Convierte los dígitos tipeados en un tiempo, de derecha a izquierda:
- * "52345" -> 52.345 s, "123456" -> 1:23.456. Devuelve null si no es válido.
- */
-export function digitsToMs(digits: string): number | null {
-  const clean = digits.replace(/\D/g, '');
-  if (!clean) return null;
-  const padded = clean.padStart(6, '0');
-  const ms = Number(padded.slice(-3));
-  const s = Number(padded.slice(-5, -3));
-  const m = Number(padded.slice(0, -5));
-  if (s >= 60) return null;
-  return m * 60000 + s * 1000 + ms;
-}
-
-export function msToDigits(ms: number): string {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const millis = ms % 1000;
-  return `${m > 0 ? m : ''}${m > 0 ? String(s).padStart(2, '0') : s}${String(millis).padStart(3, '0')}`;
 }

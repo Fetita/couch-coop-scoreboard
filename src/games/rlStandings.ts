@@ -109,3 +109,28 @@ export function award(rows: readonly RocketLeagueRow[], field: 'goals' | 'saves'
   if (max === 0) return null;
   return { playerIds: rows.filter((r) => r[field] === max).map((r) => r.playerId), value: max };
 }
+
+export interface StatRankingRow {
+  playerId: string;
+  position: number;
+  value: number;
+  played: number;
+  /** Promedio por partido jugado. */
+  perMatch: number;
+}
+
+/**
+ * Ranking de goles o saves del torneo, de mayor a menor.
+ * Si empatan, va primero el que jugó menos partidos (mejor promedio); si no, comparten puesto.
+ */
+export function statRanking(rows: readonly RocketLeagueRow[], field: 'goals' | 'saves'): StatRankingRow[] {
+  const list = rows
+    .filter((r) => r.played > 0)
+    .map((r) => ({ playerId: r.playerId, position: 0, value: r[field], played: r.played, perMatch: r[field] / r.played }));
+  const cmp = (a: StatRankingRow, b: StatRankingRow) => b.value - a.value || a.played - b.played;
+  list.sort(cmp);
+  list.forEach((r, i) => {
+    r.position = i > 0 && cmp(list[i - 1], r) === 0 ? list[i - 1].position : i + 1;
+  });
+  return list;
+}

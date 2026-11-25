@@ -2,7 +2,7 @@
 import type { AppData, Tournament } from '../model/types';
 import { isPlayed, rocketLeagueStandings } from './rlStandings';
 import { raceState } from './tmRace';
-import { trackmaniaStandings, trackRecords } from './tmTournament';
+import { trackmaniaStandings } from './tmTournament';
 
 /** Quién va primero en la tabla del torneo (puede haber empate). Vacío si no se jugó nada. */
 export function tournamentLeaders(t: Tournament): string[] {
@@ -21,7 +21,6 @@ export interface PlayerStats {
   tournamentWins: number;
   rl: { matches: number; wins: number; goals: number; saves: number; topScorer: number; bestKeeper: number };
   tm: { races: number; wins: number; podiums: number; positionSum: number };
-  records: { trackId: string; timeMs: number; isTrackRecord: boolean }[];
 }
 
 export function playerStats(data: AppData, playerId: string): PlayerStats {
@@ -30,7 +29,6 @@ export function playerStats(data: AppData, playerId: string): PlayerStats {
     tournamentWins: 0,
     rl: { matches: 0, wins: 0, goals: 0, saves: 0, topScorer: 0, bestKeeper: 0 },
     tm: { races: 0, wins: 0, podiums: 0, positionSum: 0 },
-    records: [],
   };
   for (const t of data.tournaments) {
     const took = t.playerIds.includes(playerId) || t.rlMatches.some((m) => m.team1.includes(playerId) || m.team2.includes(playerId));
@@ -62,11 +60,6 @@ export function playerStats(data: AppData, playerId: string): PlayerStats {
         if (pos <= 3) s.tm.podiums++;
       }
     }
-  }
-  for (const track of data.tmTracks) {
-    const recs = trackRecords(data, track.id);
-    const mine = recs.find((r) => r.playerId === playerId);
-    if (mine) s.records.push({ trackId: track.id, timeMs: mine.timeMs, isTrackRecord: recs[0].playerId === playerId });
   }
   return s;
 }
