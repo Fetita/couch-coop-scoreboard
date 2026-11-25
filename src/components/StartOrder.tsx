@@ -19,7 +19,7 @@ export function StartOrder({ order, players, out = [], selected, onTap }: {
           <>
             <span className="car-swatch" style={{ background: slot.hex }} />
             <span className="slot-name">{slot.name}</span>
-            <PlayerName player={players.get(id)} size={26} />
+            <PlayerName player={players.get(id)} size={26} color={slot.hex} />
           </>
         );
         const cls = `start-slot${out.includes(id) ? ' out' : ''}${selected === id ? ' on' : ''}`;

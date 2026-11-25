@@ -10,6 +10,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TournamentPage } from './pages/TournamentPage';
 import { TournamentsPage } from './pages/TournamentsPage';
 import { Icon, type IconName } from './ui/Icon';
+import { SyncBanner } from './ui/SyncBanner';
 
 const TABS: [string, IconName, string][] = [
   ['/', 'trophy', 'Torneos'],
@@ -23,6 +24,7 @@ const TABS: [string, IconName, string][] = [
 export function App() {
   return (
     <HashRouter>
+      <SyncBanner />
       <main className="app">
         <Routes>
           <Route path="/" element={<TournamentsPage />} />

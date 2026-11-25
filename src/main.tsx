@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { requestPersistentStorage } from './store/persistence';
+import { startSync } from './sync';
 import './styles.css';
 
 void requestPersistentStorage();
+startSync();
 
 // Actualización automática: al volver a la app se fija si hay una versión nueva
 // y, si la hay, recarga sola. Así no queda una versión vieja guardada en el teléfono.

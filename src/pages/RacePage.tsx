@@ -75,7 +75,7 @@ export function RacePage() {
 
       {state.finished ? (
         <section className="winner-banner">
-          <Avatar player={players.get(state.winner!)} size={64} />
+          <Avatar player={players.get(state.winner!)} size={64} color={slotOf(state.winner!).hex} />
           <Icon name="trophy" size={28} className="trophy" />
           <h2>Ganó {name(state.winner)}</h2>
           <p className="muted small">En la próxima carrera larga primero, con el auto azul.</p>
@@ -104,7 +104,7 @@ export function RacePage() {
               return (
                 <button key={pid} type="button" className="elim-btn" onClick={() => run((d) => eliminate(d, tid, race.id, pid))}>
                   <span className="car-swatch" style={{ background: slot.hex }} />
-                  <PlayerName player={players.get(pid)} size={32} bold />
+                  <PlayerName player={players.get(pid)} size={32} color={slot.hex} bold />
                   <span className="x"><Icon name="x" size={16} />Afuera</span>
                 </button>
               );
@@ -138,7 +138,7 @@ export function RacePage() {
                 <li key={pid} className={`board-row${pos === 1 ? ' p1' : ''}`}>
                   <span className="pos">{pos}</span>
                   <span className="car-swatch" style={{ background: slotOf(pid).hex }} />
-                  <span className="grow"><PlayerName player={players.get(pid)} size={28} bold={pos === 1} /></span>
+                  <span className="grow"><PlayerName player={players.get(pid)} size={28} color={slotOf(pid).hex} bold={pos === 1} /></span>
                   {state.finished && <span className="board-pts">{points.get(pid) ?? 0} pts</span>}
                 </li>
               );
