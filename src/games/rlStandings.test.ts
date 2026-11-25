@@ -63,3 +63,18 @@ describe('tabla', () => {
     expect(resultError(match(['A'], ['B'], 2, { B: { goals: 1, saves: 0 } }))).toBeNull();
   });
 });
+
+describe('ranking de goles y saves', () => {
+  it('ordena por total y desempata por menos partidos', async () => {
+    const { statRanking } = await import('./rlStandings');
+    const rows = rocketLeagueStandings(['A', 'B', 'C', 'D', 'E'], [
+      match(['A', 'B'], ['C', 'D'], 1, { A: { goals: 2, saves: 1 }, C: { goals: 1, saves: 3 } }),
+      match(['A', 'C'], ['B', 'E'], 1, { C: { goals: 1, saves: 0 }, E: { goals: 2, saves: 1 } }),
+    ], []);
+    const goals = statRanking(rows, 'goals');
+    // A, C y E tienen 2 goles; E jugó 1 partido y A y C 2: E primero. D (1 PJ) antes que B (2 PJ).
+    expect(goals.map((r) => [r.playerId, r.position])).toEqual([['E', 1], ['A', 2], ['C', 2], ['D', 4], ['B', 5]]);
+    expect(goals[0].perMatch).toBe(2);
+    expect(statRanking(rows, 'saves')[0]).toMatchObject({ playerId: 'C', value: 3 });
+  });
+});
