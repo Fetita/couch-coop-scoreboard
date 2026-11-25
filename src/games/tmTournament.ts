@@ -1,7 +1,7 @@
 // Carreras de Trackmania dentro de un torneo, pistas guardadas, tabla y récords.
 import { newId } from '../model/random';
-import type { AppData, Tournament, TrackmaniaEvent, TrackmaniaRace, TrackmaniaTrack } from '../model/types';
-import { racePoints, raceState } from './tmRace';
+import type { AppData, Tournament, TrackmaniaRace, TrackmaniaTrack } from '../model/types';
+import { racePoints, raceResult, raceState } from './tmRace';
 
 /** Modos de auto propuestos; se puede escribir otro. */
 export const CAR_MODES = ['Stadium', 'Snow', 'Rally', 'Desert'];
@@ -39,48 +39,62 @@ export function ensureTrack(data: AppData, carMode: string, name: string): [AppD
   return [{ ...data, tmTracks: [...data.tmTracks, track] }, track];
 }
 
-/** Nueva carrera. El orden de salida rota en cada carrera para que no arranque siempre el mismo. */
+/**
+ * Orden de salida de la próxima carrera: el resultado de la última carrera terminada
+ * (el ganador sale primero, con el auto azul). En la primera carrera, el orden de
+ * los jugadores del torneo (cómo están sentados). Los que no corrieron la anterior van al final.
+ */
+export function nextRaceOrder(t: Tournament): string[] {
+  const last = [...t.tmRaces].reverse().find((r) => raceState(r).finished);
+  if (!last) return [...t.playerIds];
+  const result = raceResult(last).filter((p) => t.playerIds.includes(p));
+  return [...result, ...t.playerIds.filter((p) => !result.includes(p))];
+}
+
 export function createRace(data: AppData, tournamentId: string, carMode: string, trackName: string): [AppData, TrackmaniaRace] {
   const t = data.tournaments.find((x) => x.id === tournamentId);
   if (!t) throw new Error('No existe el torneo.');
   if (t.playerIds.length < 2) throw new Error('Hacen falta al menos 2 jugadores.');
   const [withTrack, track] = ensureTrack(data, carMode, trackName);
-  const shift = t.tmRaces.length % t.playerIds.length;
   const race: TrackmaniaRace = {
     id: newId(),
     carMode: track.carMode,
     trackId: track.id,
-    order: [...t.playerIds.slice(shift), ...t.playerIds.slice(0, shift)],
-    events: [],
+    order: nextRaceOrder(t),
+    eliminated: [],
     createdAt: new Date().toISOString(),
   };
   return [mapT(withTrack, tournamentId, (x) => ({ ...x, tmRaces: [...x.tmRaces, race] })), race];
 }
 
+/** Cambia el orden de salida (y con eso los colores). Solo antes de que haya eliminados. */
 export function setRaceOrder(data: AppData, tid: string, rid: string, order: string[]): AppData {
   return mapRace(data, tid, rid, (r) => {
-    if (r.events.length > 0) throw new Error('El orden solo se cambia antes del primer intento.');
+    if (r.eliminated.length > 0) throw new Error('El orden solo se cambia antes de que quede alguien eliminado.');
     return { ...r, order };
   });
 }
 
-export function addRun(data: AppData, tid: string, rid: string, playerId: string, timeMs: number | null, outOfFuel: boolean): AppData {
-  return mapRace(data, tid, rid, (r) => ({ ...r, events: [...r.events, { id: newId(), type: 'run', playerId, timeMs, outOfFuel }] }));
+/** Intercambia dos lugares del orden de salida. */
+export function swapRaceOrder(data: AppData, tid: string, rid: string, a: string, b: string): AppData {
+  const race = data.tournaments.find((t) => t.id === tid)?.tmRaces.find((r) => r.id === rid);
+  if (!race) return data;
+  const order = race.order.map((p) => (p === a ? b : p === b ? a : p));
+  return setRaceOrder(data, tid, rid, order);
 }
 
-export function eliminateManually(data: AppData, tid: string, rid: string, playerId: string): AppData {
-  return mapRace(data, tid, rid, (r) => ({ ...r, events: [...r.events, { id: newId(), type: 'eliminate', playerId }] }));
+/** Marca a un jugador como eliminado (el próximo puesto desde abajo). */
+export function eliminate(data: AppData, tid: string, rid: string, playerId: string): AppData {
+  return mapRace(data, tid, rid, (r) => {
+    if (!r.order.includes(playerId) || r.eliminated.includes(playerId)) return r;
+    if (raceState(r).finished) throw new Error('La carrera ya terminó.');
+    return { ...r, eliminated: [...r.eliminated, playerId] };
+  });
 }
 
-export function updateEvent(data: AppData, tid: string, rid: string, eventId: string, patch: Partial<Extract<TrackmaniaEvent, { type: 'run' }>>): AppData {
-  return mapRace(data, tid, rid, (r) => ({
-    ...r,
-    events: r.events.map((e) => (e.id === eventId && e.type === 'run' ? { ...e, ...patch, id: e.id, type: 'run' } : e)),
-  }));
-}
-
-export function deleteEvent(data: AppData, tid: string, rid: string, eventId: string): AppData {
-  return mapRace(data, tid, rid, (r) => ({ ...r, events: r.events.filter((e) => e.id !== eventId) }));
+/** Vuelve a poner en carrera a un eliminado (por si se tocó mal). */
+export function undoElimination(data: AppData, tid: string, rid: string, playerId: string): AppData {
+  return mapRace(data, tid, rid, (r) => ({ ...r, eliminated: r.eliminated.filter((p) => p !== playerId) }));
 }
 
 export function deleteRace(data: AppData, tid: string, rid: string): AppData {
@@ -125,29 +139,4 @@ export function trackmaniaStandings(t: Tournament, carMode?: string): Trackmania
     r.position = i > 0 && cmp(list[i - 1], r) === 0 ? list[i - 1].position : i + 1;
   });
   return list;
-}
-
-export interface TrackRecord {
-  playerId: string;
-  timeMs: number;
-  tournamentId: string;
-  date: string;
-}
-
-/** Mejor tiempo histórico de cada jugador en una pista, del más rápido al más lento. */
-export function trackRecords(data: AppData, trackId: string): TrackRecord[] {
-  const best = new Map<string, TrackRecord>();
-  for (const t of data.tournaments) {
-    for (const race of t.tmRaces) {
-      if (race.trackId !== trackId) continue;
-      for (const e of race.events) {
-        if (e.type !== 'run' || e.timeMs === null) continue;
-        const prev = best.get(e.playerId);
-        if (!prev || e.timeMs < prev.timeMs) {
-          best.set(e.playerId, { playerId: e.playerId, timeMs: e.timeMs, tournamentId: t.id, date: race.createdAt });
-        }
-      }
-    }
-  }
-  return [...best.values()].sort((a, b) => a.timeMs - b.timeMs);
 }

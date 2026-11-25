@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FormatEditor } from '../components/FormatEditor';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { RlPlay, RlTable } from '../components/RocketLeagueSection';
-import { CarColors, TmPlay, TmTable } from '../components/TrackmaniaSection';
+import { TmPlay, TmTable } from '../components/TrackmaniaSection';
 import { describeFormat } from '../model/format';
 import { GAMES } from '../model/games';
 import { tournamentProgress } from '../model/progress';
@@ -142,14 +142,14 @@ export function TournamentPage() {
                     </li>
                   ))}
                 </ol>
-                <button type="button" className="link" onClick={() => save((d) => reshufflePlayers(d, tournament.id))}>
-                  <Icon name="shuffle" size={16} />Volver a sortear el orden
-                </button>
+                {isRL && (
+                  <button type="button" className="link" onClick={() => save((d) => reshufflePlayers(d, tournament.id))}>
+                    <Icon name="shuffle" size={16} />Volver a sortear el orden
+                  </button>
+                )}
               </>
             )}
           </section>
-
-          {!isRL && <CarColors tournament={tournament} players={playerMap} />}
 
           <section className="card">
             <div className="card-head">

@@ -82,7 +82,7 @@ describe('partidos de Rocket League', () => {
     const { rlMatches: _, ...v1t } = t;
     const v1 = { ...d, schemaVersion: 1, tournaments: [v1t] };
     const migrated = migrate(v1);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.tournaments[0].rlMatches).toHaveLength(3);
   });
 });

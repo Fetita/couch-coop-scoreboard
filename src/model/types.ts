@@ -61,26 +61,14 @@ export interface TrackmaniaTrack {
   carMode: string;
 }
 
-/** Un evento de la carrera: un intento, o una eliminación marcada a mano. */
-export type TrackmaniaEvent =
-  | {
-      id: string;
-      type: 'run';
-      playerId: string;
-      /** Tiempo en milisegundos; null si no terminó la pista. */
-      timeMs: number | null;
-      /** Se quedó sin nafta en este intento (solo cuenta después de la primera vuelta). */
-      outOfFuel: boolean;
-    }
-  | { id: string; type: 'eliminate'; playerId: string };
-
 export interface TrackmaniaRace {
   id: string;
   carMode: string;
   trackId: string;
-  /** Orden de salida de la primera vuelta. */
+  /** Orden de salida: define el color del auto (1° azul, 2° rojo, 3° verde, 4° violeta, 5° rosa). */
   order: string[];
-  events: TrackmaniaEvent[];
+  /** Eliminados en el orden en que quedaron afuera: el primero es el último puesto. */
+  eliminated: string[];
   createdAt: string;
 }
 
@@ -98,14 +86,12 @@ export interface Tournament {
   format: TournamentFormat;
   /** Solo Rocket League: partidos jugados y por jugar, en orden. */
   rlMatches: RocketLeagueMatch[];
-  /** Solo Trackmania: color del auto que el juego le asignó a cada jugador en este torneo. */
-  carColors?: Record<string, string>;
   /** Solo Trackmania: una carrera por pista jugada. */
   tmRaces: TrackmaniaRace[];
 }
 
 export interface AppData {
-  schemaVersion: 3;
+  schemaVersion: 4;
   players: Player[];
   tmTracks: TrackmaniaTrack[];
   tournaments: Tournament[];

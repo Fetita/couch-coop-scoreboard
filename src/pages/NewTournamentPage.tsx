@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormatEditor } from '../components/FormatEditor';
 import { PlayerPicker } from '../components/PlayerPicker';
-import { CarColorList } from '../components/TrackmaniaSection';
 import { describeFormat, proposeFormat } from '../model/format';
 import { GAME_LIST, GAMES } from '../model/games';
 import type { GameId, TournamentFormat } from '../model/types';
 import { createTournament, defaultTournamentName } from '../store/actions';
-import { update, useData } from '../store/store';
+import { update } from '../store/store';
 import { Icon } from '../ui/Icon';
 import { PageHeader } from '../ui/PageHeader';
 
@@ -23,10 +22,6 @@ export function NewTournamentPage() {
   const [formatFor, setFormatFor] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [carColors, setCarColors] = useState<Record<string, string>>({});
-  const [editingCar, setEditingCar] = useState<string | null>(null);
-  const data = useData();
-  const players = new Map(data.players.map((p) => [p.id, p]));
 
   const chooseGame = (g: GameId) => {
     if (g !== game) setName(defaultTournamentName(g));
@@ -49,7 +44,7 @@ export function NewTournamentPage() {
     try {
       let id = '';
       update((d) => {
-        const [next, t] = createTournament(d, { game: game!, name, playerIds, format: format!, carColors });
+        const [next, t] = createTournament(d, { game: game!, name, playerIds, format: format! });
         id = t.id;
         return next;
       });
@@ -59,7 +54,6 @@ export function NewTournamentPage() {
     }
   };
 
-  const missingColors = game === 'trackmania' ? playerIds.filter((id) => !carColors[id]).length : 0;
   const canPlayers = game !== null;
   const canFormat = game !== null && playerIds.length >= 2;
   const stepIndex = ORDER.indexOf(step);
@@ -118,7 +112,11 @@ export function NewTournamentPage() {
               )}
             </div>
             <PlayerPicker selected={playerIds} onChange={setPlayerIds} />
-            <p className="hint">Tocá para elegir. El orden se sortea al crear el torneo.</p>
+            <p className="hint">
+              {game === 'trackmania'
+                ? 'Tocá para elegir. El orden de salida de la primera carrera se acomoda antes de largar.'
+                : 'Tocá para elegir. El orden se sortea al crear el torneo.'}
+            </p>
           </section>
           <div className="actionbar">
             <div className="actionbar-inner">
@@ -149,29 +147,12 @@ export function NewTournamentPage() {
             </p>
             <FormatEditor format={format} players={playerIds.length} onChange={setFormat} />
           </section>
-          {game === 'trackmania' && (
-            <section className="card">
-              <div className="card-head">
-                <h2>Color de cada auto</h2>
-                <span className="hint">{missingColors ? `Faltan ${missingColors}` : 'Listo'}</span>
-              </div>
-              <p className="muted small">En el juego los colores salen al azar: elegí el que le tocó a cada uno.</p>
-              <CarColorList
-                playerIds={playerIds}
-                players={players}
-                colors={carColors}
-                editing={editingCar}
-                setEditing={setEditingCar}
-                onChange={(id, c) => setCarColors((x) => ({ ...x, [id]: c }))}
-              />
-            </section>
-          )}
           {error && <p className="error">{error}</p>}
           <div className="actionbar">
             <div className="actionbar-inner">
-              <button type="button" className="btn btn-primary btn-block" disabled={missingColors > 0} onClick={create}>
-                {missingColors > 0 ? (
-                  <>Falta el color de {missingColors} {missingColors === 1 ? 'auto' : 'autos'}</>
+              <button type="button" className="btn btn-primary btn-block" onClick={create}>
+                {game === 'trackmania' ? (
+                  <><Icon name="flag" size={18} /> Crear torneo</>
                 ) : (
                   <><Icon name="shuffle" size={18} /> Crear torneo y sortear orden</>
                 )}

@@ -4,7 +4,7 @@ import { emptyData, migrate } from '../store/persistence';
 import type { AppData } from '../model/types';
 import { playerStats, tournamentLeaders } from './stats';
 import { raceState } from './tmRace';
-import { addRun, createRace, deleteEvent, eliminateManually, ensureTrack, trackmaniaStandings, trackRecords, tracksForMode, updateEvent } from './tmTournament';
+import { createRace, eliminate, ensureTrack, swapRaceOrder, trackmaniaStandings, tracksForMode, undoElimination } from './tmTournament';
 
 function setup(): [AppData, string, string[]] {
   let d = emptyData();
@@ -15,15 +15,12 @@ function setup(): [AppData, string, string[]] {
 }
 
 /** Juega una carrera completa donde el orden final es `finish` (primero = ganador). */
-function playRace(d: AppData, tid: string, mode: string, track: string, finish: string[], base = 50000): AppData {
+function playRace(d: AppData, tid: string, mode: string, track: string, finish: string[]): AppData {
   let raceId: string;
   [d, { id: raceId }] = createRace(d, tid, mode, track);
   const race = () => d.tournaments.find((t) => t.id === tid)!.tmRaces.find((r) => r.id === raceId)!;
-  for (const p of race().order) d = addRun(d, tid, raceId, p, base + finish.indexOf(p) * 1000, false);
-  while (!raceState(race()).finished) {
-    const next = raceState(race()).next!;
-    d = addRun(d, tid, raceId, next, null, true);
-  }
+  for (const p of [...finish].reverse().slice(0, -1)) d = eliminate(d, tid, raceId, p);
+  expect(raceState(race()).finished).toBe(true);
   return d;
 }
 
@@ -39,13 +36,42 @@ describe('torneo de Trackmania', () => {
     expect(tracksForMode(d, 'Stadium')).toHaveLength(1);
   });
 
-  it('rota el orden de salida en cada carrera', () => {
+  it('la primera carrera sale en el orden del torneo y las siguientes según el resultado anterior', () => {
     let [d, tid, order] = setup();
-    let r1, r2;
+    const [a, b, c] = order;
+    let r1;
     [d, r1] = createRace(d, tid, 'Stadium', 'A01');
-    [d, r2] = createRace(d, tid, 'Stadium', 'A02');
     expect(r1.order).toEqual(order);
-    expect(r2.order).toEqual([...order.slice(1), order[0]]);
+    d = eliminate(d, tid, r1.id, b);
+    d = eliminate(d, tid, r1.id, a);
+    let r2;
+    [d, r2] = createRace(d, tid, 'Stadium', 'A02');
+    // Ganó c (azul), segundo a (rojo), tercero b (verde).
+    expect(r2.order).toEqual([c, a, b]);
+  });
+
+  it('en Trackmania no se sortea: queda el orden en que se eligieron', () => {
+    let d = emptyData();
+    for (const n of ['A', 'B', 'C', 'D']) d = addPlayer(d, n)[0];
+    const ids = d.players.map((p) => p.id);
+    const [, t] = createTournament(d, { game: 'trackmania', playerIds: ids }, () => 0.1);
+    expect(t.playerIds).toEqual(ids);
+  });
+
+  it('cambia el orden antes de largar, deshace eliminaciones', () => {
+    let [d, tid, order] = setup();
+    const [a, b, c] = order;
+    let race;
+    [d, race] = createRace(d, tid, 'Stadium', 'A01');
+    d = swapRaceOrder(d, tid, race.id, a, c);
+    expect(d.tournaments[0].tmRaces[0].order).toEqual([c, b, a]);
+    d = eliminate(d, tid, race.id, b);
+    expect(() => swapRaceOrder(d, tid, race.id, a, c)).toThrow();
+    d = undoElimination(d, tid, race.id, b);
+    expect(d.tournaments[0].tmRaces[0].eliminated).toEqual([]);
+    d = eliminate(d, tid, race.id, b);
+    d = eliminate(d, tid, race.id, a);
+    expect(() => eliminate(d, tid, race.id, c)).toThrow();
   });
 
   it('suma puntos de carreras terminadas y filtra por modo', () => {
@@ -70,46 +96,51 @@ describe('torneo de Trackmania', () => {
     expect(tournamentLeaders(d.tournaments[0])).toEqual([]);
   });
 
-  it('corrige, borra intentos y elimina a mano', () => {
-    let [d, tid, order] = setup();
-    let race;
-    [d, race] = createRace(d, tid, 'Stadium', 'A01');
-    d = addRun(d, tid, race.id, order[0], 50000, false);
-    const ev = d.tournaments[0].tmRaces[0].events[0];
-    d = updateEvent(d, tid, race.id, ev.id, { timeMs: 45000 });
-    expect(d.tournaments[0].tmRaces[0].events[0]).toMatchObject({ timeMs: 45000, type: 'run' });
-    d = deleteEvent(d, tid, race.id, ev.id);
-    expect(d.tournaments[0].tmRaces[0].events).toHaveLength(0);
-    d = eliminateManually(d, tid, race.id, order[2]);
-    expect(raceState(d.tournaments[0].tmRaces[0]).eliminated).toEqual([order[2]]);
-  });
-
-  it('récords por pista entre torneos', () => {
+  it('estadísticas del jugador entre torneos', () => {
     let [d, tid] = setup();
     const [a, b, c] = d.players.map((p) => p.id);
-    d = playRace(d, tid, 'Stadium', 'A01', [b, a, c], 40000);
+    d = playRace(d, tid, 'Stadium', 'A01', [b, a, c]);
     d = finishTournament(d, tid);
     let t2;
     [d, t2] = createTournament(d, { game: 'trackmania', playerIds: [a, b, c] });
-    d = playRace(d, t2.id, 'Stadium', 'A01', [a, b, c], 39000);
-    const track = d.tmTracks[0];
-    const recs = trackRecords(d, track.id);
-    expect(recs[0]).toMatchObject({ playerId: a, timeMs: 39000 });
-    expect(recs).toHaveLength(3);
+    d = playRace(d, t2.id, 'Stadium', 'A01', [a, b, c]);
     const stats = playerStats(d, b);
     expect(stats.tournaments).toBe(2);
     expect(stats.tournamentWins).toBe(1);
     expect(stats.tm).toMatchObject({ races: 2, wins: 1, podiums: 2 });
-    expect(stats.records).toEqual([{ trackId: track.id, timeMs: 40000, isTrackRecord: false }]);
   });
 
   it('migra datos v2', () => {
     const [d] = setup();
     const v2 = { schemaVersion: 2, players: d.players, tournaments: d.tournaments.map(({ tmRaces: _, ...t }) => t) };
     const m = migrate(v2);
-    expect(m.schemaVersion).toBe(3);
+    expect(m.schemaVersion).toBe(4);
     expect(m.tmTracks).toEqual([]);
     expect(m.tournaments[0].tmRaces).toEqual([]);
+  });
+
+  it('migra carreras v3 con tiempos al orden de eliminación', () => {
+    const run = (playerId: string, timeMs: number | null, outOfFuel = false) => ({ id: playerId + timeMs, type: 'run', playerId, timeMs, outOfFuel });
+    const v3 = {
+      schemaVersion: 3,
+      players: [],
+      tmTracks: [],
+      tournaments: [{
+        id: 't', name: 'T', game: 'trackmania', createdAt: '', status: 'active', playerIds: ['A', 'B', 'C'],
+        format: { game: 'trackmania', tracks: 3, pointsScale: [3, 2, 1] }, rlMatches: [], carColors: { A: '#fff' },
+        tmRaces: [{
+          id: 'r', carMode: 'Stadium', trackId: 'x', createdAt: '', order: ['A', 'B', 'C'],
+          // C es el más lento, se queda sin nafta: afuera. Después A sin nafta: afuera. Gana B.
+          events: [run('A', 50000), run('B', 49000), run('C', 51000), run('C', 50500, true), run('A', 49800, true)],
+        }],
+      }],
+    };
+    const m = migrate(v3);
+    const t = m.tournaments[0];
+    expect(t).not.toHaveProperty('carColors');
+    expect(t.tmRaces[0]).not.toHaveProperty('events');
+    expect(t.tmRaces[0].eliminated).toEqual(['C', 'A']);
+    expect(raceState(t.tmRaces[0]).winner).toBe('B');
   });
 });
 
@@ -130,26 +161,5 @@ describe('tabla general', () => {
     expect(byId[m.team2[0]].rlPoints).toBe(1);
     expect(rows[0].playerId).toBe(rows.reduce((best, r) => (r.points > best.points ? r : best)).playerId);
     expect(generalStandings(d, 'rocket-league').every((r) => r.tmPoints === 0)).toBe(true);
-  });
-});
-
-describe('color de auto por torneo', () => {
-  it('se elige al crear el torneo y se puede cambiar', async () => {
-    const { setCarColor } = await import('../store/actions');
-    const { carColor } = await import('../model/colors');
-    let d = emptyData();
-    for (const n of ['A', 'B']) d = addPlayer(d, n)[0];
-    const [a, b] = d.players;
-    let t;
-    [d, t] = createTournament(d, { game: 'trackmania', playerIds: [a.id, b.id], carColors: { [a.id]: '#ff0000' } });
-    expect(carColor(t, a)).toBe('#ff0000');
-    expect(carColor(t, b)).toBe(b.color);
-    d = setCarColor(d, t.id, b.id, '#00ff00');
-    expect(carColor(d.tournaments[0], b)).toBe('#00ff00');
-    // Cada torneo tiene sus propios colores.
-    let t2;
-    [d, t2] = createTournament(d, { game: 'trackmania', playerIds: [a.id, b.id], carColors: { [a.id]: '#0000ff' } });
-    expect(carColor(t2, a)).toBe('#0000ff');
-    expect(carColor(d.tournaments.find((x) => x.id === t.id), a)).toBe('#ff0000');
   });
 });

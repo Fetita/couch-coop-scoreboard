@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatTime, raceState } from '../games/tmRace';
-import { carModes, createRace, trackmaniaStandings, tracksForMode } from '../games/tmTournament';
-import { carColor, hasCarColor } from '../model/colors';
+import { raceState } from '../games/tmRace';
+import { carModes, createRace, nextRaceOrder, trackmaniaStandings, tracksForMode } from '../games/tmTournament';
 import type { Player, Tournament, TrackmaniaFormat } from '../model/types';
-import { setCarColor } from '../store/actions';
 import { update, useData } from '../store/store';
-import { Avatar, PlayerName } from '../ui/Avatar';
+import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { Podium } from '../ui/Podium';
 import { RankTable } from '../ui/RankTable';
-import { ColorPicker } from './ColorPicker';
+import { StartOrder } from './StartOrder';
 
 export function TmPlay({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
   const data = useData();
@@ -19,40 +17,24 @@ export function TmPlay({ tournament, players }: { tournament: Tournament; player
   const finished = tournament.status === 'finished';
   const running = tournament.tmRaces.find((r) => !raceState(r).finished);
   const runningState = running ? raceState(running) : null;
-  const nextRunner = runningState?.next ? players.get(runningState.next) : undefined;
-  const colorOf = (p?: Player) => carColor(tournament, p);
-
-  const missing = tournament.playerIds.filter((id) => !hasCarColor(tournament, id));
 
   return (
     <>
-      {missing.length > 0 && !finished && (
-        <p className="fuel-out">
-          <Icon name="car" size={18} />
-          Falta el color de auto de {missing.map((id) => players.get(id)?.name).join(', ')}. Elegilo en Ajustes.
-        </p>
-      )}
       {running && runningState && (
         <section className="card highlight">
           <div className="card-head">
             <h2>Carrera en curso</h2>
             <span className="pill live">{tracks.get(running.trackId)?.name} · {running.carMode}</span>
           </div>
-          <div className="runner">
-            <span className="runner-label">{runningState.firstLap ? 'Primera vuelta' : 'Eliminación'} · le toca a</span>
-            <span className="runner-name">
-              <span className="car-swatch" style={{ background: colorOf(nextRunner) }} />
-              {nextRunner?.name}
-            </span>
-            <span className="hint">{runningState.standing.length} en carrera · {runningState.eliminated.length} afuera</span>
-          </div>
+          <StartOrder order={running.order} players={players} out={runningState.eliminated} />
+          <span className="hint center">{runningState.remaining.length} en carrera · {runningState.eliminated.length} afuera</span>
           <Link to={`/torneo/${tournament.id}/carrera/${running.id}`} className="btn btn-primary btn-block">
             <Icon name="play" size={18} />Ir a la carrera
           </Link>
         </section>
       )}
       {!running && !finished && (
-        <NewRace tournament={tournament} number={tournament.tmRaces.length + 1} planned={format.tracks} />
+        <NewRace tournament={tournament} number={tournament.tmRaces.length + 1} planned={format.tracks} players={players} />
       )}
 
       {tournament.tmRaces.length > 0 && (
@@ -71,12 +53,12 @@ export function TmPlay({ tournament, players }: { tournament: Tournament; player
                     <span className="match-num">{i + 1}</span>
                     <span className="grow stack-sm" style={{ gap: 2 }}>
                       <strong>{tracks.get(r.trackId)?.name ?? '?'}</strong>
-                      <span className="hint">{r.carMode}{st.finished && st.winner ? ` · ${formatTime(st.best.get(st.winner))}` : ''}</span>
+                      <span className="hint">{r.carMode}{st.finished && winner ? ` · ganó ${winner.name}` : ''}</span>
                     </span>
                     {st.finished && winner ? (
                       <span className="row" style={{ gap: 6 }}>
                         <Icon name="trophy" size={16} className="trophy" />
-                        <Avatar player={winner} size={26} color={colorOf(winner)} />
+                        <Avatar player={winner} size={26} />
                       </span>
                     ) : (
                       <span className="pill live">En curso</span>
@@ -98,7 +80,6 @@ export function TmTable({ tournament, players }: { tournament: Tournament; playe
   const usedModes = [...new Set(tournament.tmRaces.map((r) => r.carMode))];
   const rows = trackmaniaStandings(tournament, modeFilter ?? undefined);
   const anyFinished = rows.some((r) => r.races > 0);
-  const colorOf = (p?: Player) => carColor(tournament, p);
 
   return (
     <>
@@ -112,7 +93,7 @@ export function TmTable({ tournament, players }: { tournament: Tournament; playe
       )}
       {anyFinished && (
         <section className="card">
-          <Podium players={players} colorOf={colorOf} spots={rows.slice(0, 3).map((r) => ({ playerId: r.playerId, value: `${r.points} pts` }))} />
+          <Podium players={players} spots={rows.slice(0, 3).map((r) => ({ playerId: r.playerId, value: `${r.points} pts` }))} />
         </section>
       )}
       <section className="card">
@@ -123,7 +104,6 @@ export function TmTable({ tournament, players }: { tournament: Tournament; playe
         <RankTable
           rows={rows}
           players={players}
-          colorOf={colorOf}
           link
           columns={[
             { label: 'Pts', title: 'Puntos', value: (r) => r.points, strong: true },
@@ -137,7 +117,7 @@ export function TmTable({ tournament, players }: { tournament: Tournament; playe
   );
 }
 
-function NewRace({ tournament, number, planned }: { tournament: Tournament; number: number; planned: number }) {
+function NewRace({ tournament, number, planned, players }: { tournament: Tournament; number: number; planned: number; players: Map<string, Player> }) {
   const data = useData();
   const navigate = useNavigate();
   const modes = carModes(data);
@@ -149,6 +129,8 @@ function NewRace({ tournament, number, planned }: { tournament: Tournament; numb
   const effectiveMode = mode === '__other' ? customMode.trim() : mode;
   const known = effectiveMode ? tracksForMode(data, effectiveMode) : [];
   const playedHere = new Set(tournament.tmRaces.map((r) => r.trackId));
+  const order = nextRaceOrder(tournament);
+  const fromResult = tournament.tmRaces.some((r) => raceState(r).finished);
 
   const start = () => {
     try {
@@ -198,70 +180,19 @@ function NewRace({ tournament, number, planned }: { tournament: Tournament; numb
         <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder={known.length ? 'O escribí una nueva' : 'Nombre de la pista'} aria-label="Pista" />
         {known.length > 0 && <div className="hint">Con ✓ las que ya se corrieron en este torneo.</div>}
       </div>
+      <div className="field">
+        <div className="field-label">3. Orden de salida</div>
+        <StartOrder order={order} players={players} />
+        <div className="hint">
+          {fromResult
+            ? 'Según cómo salió la carrera anterior: el que ganó larga primero con el azul.'
+            : 'Cómo están sentados. Se puede cambiar al entrar a la carrera.'}
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       <button type="button" className="btn btn-primary btn-block" disabled={!effectiveMode || !track.trim()} onClick={start}>
         <Icon name="flag" size={18} />Empezar carrera
       </button>
     </section>
-  );
-}
-
-/** El color de auto que el juego le asignó a cada uno (sale al azar en cada partida). */
-export function CarColors({ tournament, players }: { tournament: Tournament; players: Map<string, Player> }) {
-  const [editing, setEditing] = useState<string | null>(null);
-  return (
-    <section className="card">
-      <div className="card-head">
-        <h2>Autos</h2>
-        <span className="hint">El color que le tocó a cada uno</span>
-      </div>
-      <CarColorList
-        playerIds={tournament.playerIds}
-        players={players}
-        colors={tournament.carColors ?? {}}
-        editing={editing}
-        setEditing={setEditing}
-        onChange={(id, c) => update((d) => setCarColor(d, tournament.id, id, c))}
-      />
-    </section>
-  );
-}
-
-/** Lista de jugadores con el color de su auto. Se usa al crear el torneo y en sus ajustes. */
-export function CarColorList({ playerIds, players, colors, editing, setEditing, onChange }: {
-  playerIds: string[];
-  players: Map<string, Player>;
-  colors: Record<string, string>;
-  editing: string | null;
-  setEditing: (id: string | null) => void;
-  onChange: (playerId: string, color: string) => void;
-}) {
-  return (
-    <div className="stack-sm">
-      {playerIds.map((id) => {
-        const p = players.get(id);
-        if (!p) return null;
-        const color = colors[id];
-        return (
-          <div key={id} className="stack-sm">
-            <button type="button" className={`car-row${editing === id ? ' on' : ''}`} onClick={() => setEditing(editing === id ? null : id)}>
-              {color ? <span className="car-swatch" style={{ background: color }} /> : <span className="car-swatch empty">?</span>}
-              <PlayerName player={p} size={26} />
-              <span className="grow" />
-              <span className="hint">{editing === id ? 'Listo' : color ? 'Cambiar' : 'Elegir color'}</span>
-            </button>
-            {editing === id && (
-              <ColorPicker label={`Color del auto de ${p.name}`} value={color ?? p.color}
-                onChange={(c) => {
-                  onChange(id, c);
-                  // Pasa solo al siguiente que falta, para cargar todos rápido.
-                  const nextMissing = playerIds.find((x) => x !== id && !colors[x]);
-                  setEditing(nextMissing ?? null);
-                }} />
-            )}
-          </div>
-        );
-      })}
-    </div>
   );
 }
